@@ -257,118 +257,125 @@ export default function WorkList({
         </div>
 
         {showFilters && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Search</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <div className="p-4 bg-gray-50 rounded-lg space-y-4">
+            {/* Mobile-first responsive grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {/* Search - Full width on mobile */}
+              <div className="space-y-2 sm:col-span-2 lg:col-span-1">
+                <label className="text-sm font-medium">Search</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Search works..."
+                    value={filters.search || ""}
+                    onChange={(e) => handleFilterChange("search", e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Client</label>
+                <Select
+                  value={filters.clientId || ""}
+                  onValueChange={(value) => handleFilterChange("clientId", value || undefined)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="All clients" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All clients</SelectItem>
+                    {clientsData?.clients?.map((client) => (
+                      <SelectItem key={client._id} value={client._id}>
+                        {client.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Work Type</label>
+                <Select
+                  value={filters.workType || ""}
+                  onValueChange={(value) => handleFilterChange("workType", value || undefined)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="All types" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All types</SelectItem>
+                    <SelectItem value="online-work">Online Work</SelectItem>
+                    <SelectItem value="health-insurance">Health Insurance</SelectItem>
+                    <SelectItem value="life-insurance">Life Insurance</SelectItem>
+                    <SelectItem value="income-tax">Income Tax</SelectItem>
+                    <SelectItem value="mutual-funds">Mutual Funds</SelectItem>
+                    <SelectItem value="others">Others</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Payment Status</label>
+                <Select
+                  value={filters.paymentStatus || ""}
+                  onValueChange={(value) => handleFilterChange("paymentStatus", value || undefined)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="All statuses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All statuses</SelectItem>
+                    <SelectItem value="paid">Paid</SelectItem>
+                    <SelectItem value="partial">Partial</SelectItem>
+                    <SelectItem value="unpaid">Unpaid</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Date and Amount Filters */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Date From</label>
                 <Input
-                  placeholder="Search works..."
-                  value={filters.search || ""}
-                  onChange={(e) => handleFilterChange("search", e.target.value)}
-                  className="pl-10"
+                  type="date"
+                  value={filters.dateFrom || ""}
+                  onChange={(e) => handleFilterChange("dateFrom", e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Date To</label>
+                <Input
+                  type="date"
+                  value={filters.dateTo || ""}
+                  onChange={(e) => handleFilterChange("dateTo", e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Min Amount (₹)</label>
+                <Input
+                  type="number"
+                  placeholder="0"
+                  value={filters.amountMin || ""}
+                  onChange={(e) => handleFilterChange("amountMin", e.target.value ? Number(e.target.value) : undefined)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Max Amount (₹)</label>
+                <Input
+                  type="number"
+                  placeholder="No limit"
+                  value={filters.amountMax || ""}
+                  onChange={(e) => handleFilterChange("amountMax", e.target.value ? Number(e.target.value) : undefined)}
                 />
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Client</label>
-              <Select
-                value={filters.clientId || ""}
-                onValueChange={(value) => handleFilterChange("clientId", value || undefined)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="All clients" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All clients</SelectItem>
-                  {clientsData?.clients?.map((client) => (
-                    <SelectItem key={client._id} value={client._id}>
-                      {client.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Work Type</label>
-              <Select
-                value={filters.workType || ""}
-                onValueChange={(value) => handleFilterChange("workType", value || undefined)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="All types" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All types</SelectItem>
-                  <SelectItem value="online-work">Online Work</SelectItem>
-                  <SelectItem value="health-insurance">Health Insurance</SelectItem>
-                  <SelectItem value="life-insurance">Life Insurance</SelectItem>
-                  <SelectItem value="income-tax">Income Tax</SelectItem>
-                  <SelectItem value="mutual-funds">Mutual Funds</SelectItem>
-                  <SelectItem value="others">Others</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Payment Status</label>
-              <Select
-                value={filters.paymentStatus || ""}
-                onValueChange={(value) => handleFilterChange("paymentStatus", value || undefined)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="All statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All statuses</SelectItem>
-                  <SelectItem value="paid">Paid</SelectItem>
-                  <SelectItem value="partial">Partial</SelectItem>
-                  <SelectItem value="unpaid">Unpaid</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Date From</label>
-              <Input
-                type="date"
-                value={filters.dateFrom || ""}
-                onChange={(e) => handleFilterChange("dateFrom", e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Date To</label>
-              <Input
-                type="date"
-                value={filters.dateTo || ""}
-                onChange={(e) => handleFilterChange("dateTo", e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Min Amount (₹)</label>
-              <Input
-                type="number"
-                placeholder="0"
-                value={filters.amountMin || ""}
-                onChange={(e) => handleFilterChange("amountMin", e.target.value ? Number(e.target.value) : undefined)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Max Amount (₹)</label>
-              <Input
-                type="number"
-                placeholder="No limit"
-                value={filters.amountMax || ""}
-                onChange={(e) => handleFilterChange("amountMax", e.target.value ? Number(e.target.value) : undefined)}
-              />
-            </div>
-
-            <div className="flex items-end">
+            <div className="flex justify-end">
               <Button variant="outline" onClick={clearFilters}>
                 Clear Filters
               </Button>
@@ -378,7 +385,8 @@ export default function WorkList({
       </CardHeader>
 
       <CardContent>
-        <div className="rounded-md border">
+        {/* Desktop Table View */}
+        <div className="hidden lg:block rounded-md border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -521,10 +529,101 @@ export default function WorkList({
           </Table>
         </div>
 
+        {/* Mobile Card View */}
+        <div className="lg:hidden">
+          {paginatedWorks.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              No work transactions found
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {paginatedWorks.map((work) => {
+                const client = clientMap[work.clientId];
+                const balance = work.totalPrice - work.paidAmount;
+
+                return (
+                  <Card key={work._id} className="p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          {showSelection && (
+                            <input
+                              type="checkbox"
+                              checked={selectedWorks.includes(work._id)}
+                              onChange={(e) => handleWorkSelection(work._id, e.target.checked)}
+                              className="rounded border-gray-300"
+                            />
+                          )}
+                          <h3 className="font-medium text-lg">
+                            {client?.name || "Unknown Client"}
+                          </h3>
+                        </div>
+                        <p className="text-sm text-gray-500">{work.transactionDate}</p>
+                      </div>
+                      <PaymentStatusBadge status={work.paymentStatus} />
+                    </div>
+
+                    <div className="space-y-2 mb-4">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Work Type:</span>
+                        <span className="font-medium">{getWorkTypeLabel(work.workType)}</span>
+                      </div>
+                      <div className="text-sm">
+                        <span className="text-gray-500">Description:</span>
+                        <p className="mt-1">{work.description}</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4 text-sm mb-4">
+                      <div>
+                        <p className="text-gray-500">Total</p>
+                        <p className="font-medium">{formatCurrency(work.totalPrice)}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500">Paid</p>
+                        <p className="font-medium">{formatCurrency(work.paidAmount)}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500">Balance</p>
+                        <p className={`font-medium ${balance > 0 ? "text-red-600" : balance < 0 ? "text-green-600" : ""}`}>
+                          {formatCurrency(Math.abs(balance))}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-3 border-t">
+                      {onEditWork && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onEditWork(work)}
+                          className="flex-1"
+                        >
+                          Edit
+                        </Button>
+                      )}
+                      {onDeleteWork && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onDeleteWork(work)}
+                          className="flex-1"
+                        >
+                          Delete
+                        </Button>
+                      )}
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between mt-4">
-            <div className="text-sm text-gray-500">
+          <div className="flex flex-col sm:flex-row items-center justify-between mt-4 gap-4">
+            <div className="text-sm text-gray-500 text-center sm:text-left">
               Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
               {Math.min(currentPage * itemsPerPage, filteredAndSortedWorks.length)} of{" "}
               {filteredAndSortedWorks.length} results

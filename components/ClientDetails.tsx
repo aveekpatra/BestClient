@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '../convex/_generated/api'
 import { Id } from '../convex/_generated/dataModel'
+import { Work } from '../lib/types'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
@@ -122,7 +123,7 @@ export function ClientDetails({ clientId, onEdit, onDelete, onClose }: ClientDet
   const balanceInfo = getBalanceInfo(client.balance)
 
   // Helper function to check if work is overdue (unpaid/partial after 30 days)
-  const isWorkOverdue = (work: any) => {
+  const isWorkOverdue = (work: Work) => {
     if (work.paymentStatus === 'paid') return false
     
     const workDate = new Date(work.transactionDate.split('/').reverse().join('-'))

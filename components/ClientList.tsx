@@ -169,9 +169,10 @@ export function ClientList({ onClientSelect, onClientEdit, onClientCreate }: Cli
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            {/* Search */}
-            <div className="relative">
+          {/* Mobile-first responsive grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+            {/* Search - Full width on mobile */}
+            <div className="relative sm:col-span-2 lg:col-span-1">
               <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
               <Input
                 placeholder="Search clients..."
@@ -221,25 +222,27 @@ export function ClientList({ onClientSelect, onClientEdit, onClientCreate }: Cli
               </SelectContent>
             </Select>
 
-            {/* Balance Range */}
-            <Input
-              type="number"
-              placeholder="Min Balance (₹)"
-              value={balanceMin}
-              onChange={(e) => {
-                setBalanceMin(e.target.value)
-                handleFilterChange()
-              }}
-            />
-            <Input
-              type="number"
-              placeholder="Max Balance (₹)"
-              value={balanceMax}
-              onChange={(e) => {
-                setBalanceMax(e.target.value)
-                handleFilterChange()
-              }}
-            />
+            {/* Balance Range - Stack on mobile */}
+            <div className="sm:col-span-2 lg:col-span-2 xl:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Input
+                type="number"
+                placeholder="Min Balance (₹)"
+                value={balanceMin}
+                onChange={(e) => {
+                  setBalanceMin(e.target.value)
+                  handleFilterChange()
+                }}
+              />
+              <Input
+                type="number"
+                placeholder="Max Balance (₹)"
+                value={balanceMax}
+                onChange={(e) => {
+                  setBalanceMax(e.target.value)
+                  handleFilterChange()
+                }}
+              />
+            </div>
           </div>
 
           <div className="flex justify-end">
@@ -261,78 +264,123 @@ export function ClientList({ onClientSelect, onClientEdit, onClientCreate }: Cli
             </div>
           ) : (
             <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-gray-50"
-                      onClick={() => handleSort('name')}
-                    >
-                      Name {getSortIcon('name')}
-                    </TableHead>
-                    <TableHead>Contact</TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-gray-50"
-                      onClick={() => handleSort('usualWorkType')}
-                    >
-                      Work Type {getSortIcon('usualWorkType')}
-                    </TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-gray-50"
-                      onClick={() => handleSort('balance')}
-                    >
-                      Balance {getSortIcon('balance')}
-                    </TableHead>
-                    <TableHead>Documents</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {clientsData?.clients?.map((client) => (
-                    <TableRow 
-                      key={client._id}
-                      className="cursor-pointer hover:bg-gray-50"
-                      onClick={() => onClientSelect?.(client._id)}
-                    >
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{client.name}</div>
-                          <div className="text-sm text-gray-500">{client.address}</div>
+              {/* Desktop Table View */}
+              <div className="hidden md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead 
+                        className="cursor-pointer hover:bg-gray-50"
+                        onClick={() => handleSort('name')}
+                      >
+                        Name {getSortIcon('name')}
+                      </TableHead>
+                      <TableHead>Contact</TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:bg-gray-50"
+                        onClick={() => handleSort('usualWorkType')}
+                      >
+                        Work Type {getSortIcon('usualWorkType')}
+                      </TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:bg-gray-50"
+                        onClick={() => handleSort('balance')}
+                      >
+                        Balance {getSortIcon('balance')}
+                      </TableHead>
+                      <TableHead>Documents</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {clientsData?.clients?.map((client) => (
+                      <TableRow 
+                        key={client._id}
+                        className="cursor-pointer hover:bg-gray-50"
+                        onClick={() => onClientSelect?.(client._id)}
+                      >
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{client.name}</div>
+                            <div className="text-sm text-gray-500">{client.address}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div className="text-sm">{formatPhone(client.phone)}</div>
+                            {client.email && (
+                              <div className="text-sm text-gray-500">{client.email}</div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {getWorkTypeLabel(client.usualWorkType)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className={`font-medium ${getBalanceColor(client.balance)}`}>
+                            {formatCurrency(Math.abs(client.balance))}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {getBalanceLabel(client.balance)}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            {client.panNumber && (
+                              <div className="text-xs">PAN: {formatPAN(client.panNumber)}</div>
+                            )}
+                            {client.aadharNumber && (
+                              <div className="text-xs">Aadhar: {formatAadhar(client.aadharNumber)}</div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex space-x-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                onClientEdit?.(client._id)
+                              }}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setDeleteClientId(client._id)
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Mobile Card View */}
+              <div className="md:hidden space-y-4 p-4">
+                {clientsData?.clients?.map((client) => (
+                  <Card 
+                    key={client._id}
+                    className="cursor-pointer hover:shadow-md transition-shadow"
+                    onClick={() => onClientSelect?.(client._id)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <h3 className="font-medium text-lg">{client.name}</h3>
+                          <p className="text-sm text-gray-500 mt-1">{client.address}</p>
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="text-sm">{formatPhone(client.phone)}</div>
-                          {client.email && (
-                            <div className="text-sm text-gray-500">{client.email}</div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {getWorkTypeLabel(client.usualWorkType)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className={`font-medium ${getBalanceColor(client.balance)}`}>
-                          {formatCurrency(Math.abs(client.balance))}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {getBalanceLabel(client.balance)}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          {client.panNumber && (
-                            <div className="text-xs">PAN: {formatPAN(client.panNumber)}</div>
-                          )}
-                          {client.aadharNumber && (
-                            <div className="text-xs">Aadhar: {formatAadhar(client.aadharNumber)}</div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex space-x-2">
+                        <div className="flex space-x-1 ml-2">
                           <Button
                             variant="ghost"
                             size="sm"
@@ -354,15 +402,50 @@ export function ClientList({ onClientSelect, onClientEdit, onClientCreate }: Cli
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="text-gray-500">Phone</p>
+                          <p className="font-medium">{formatPhone(client.phone)}</p>
+                          {client.email && (
+                            <>
+                              <p className="text-gray-500 mt-2">Email</p>
+                              <p className="font-medium">{client.email}</p>
+                            </>
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-gray-500">Work Type</p>
+                          <Badge variant="outline" className="mt-1">
+                            {getWorkTypeLabel(client.usualWorkType)}
+                          </Badge>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center justify-between mt-4 pt-3 border-t">
+                        <div>
+                          <p className="text-gray-500 text-sm">Balance</p>
+                          <div className={`font-medium ${getBalanceColor(client.balance)}`}>
+                            {formatCurrency(Math.abs(client.balance))} 
+                            <span className="text-xs ml-1">({getBalanceLabel(client.balance)})</span>
+                          </div>
+                        </div>
+                        {(client.panNumber || client.aadharNumber) && (
+                          <div className="text-right text-xs text-gray-500">
+                            {client.panNumber && <div>PAN: {formatPAN(client.panNumber)}</div>}
+                            {client.aadharNumber && <div>Aadhar: {formatAadhar(client.aadharNumber)}</div>}
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
 
               {/* Pagination */}
-              <div className="flex items-center justify-between p-4 border-t">
-                <div className="text-sm text-gray-500">
+              <div className="flex flex-col sm:flex-row items-center justify-between p-4 border-t gap-4">
+                <div className="text-sm text-gray-500 text-center sm:text-left">
                   Showing {currentPage * pageSize + 1} to {Math.min((currentPage + 1) * pageSize, total)} of {total} clients
                 </div>
                 <div className="flex space-x-2">

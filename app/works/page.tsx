@@ -9,6 +9,7 @@ import AppLayout from "../../components/AppLayout";
 import WorkList from "../../components/WorkList";
 import WorkFormModal from "../../components/WorkFormModal";
 import ConfirmDialog from "../../components/ConfirmDialog";
+import ReceiptGenerator from "../../components/ReceiptGenerator";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
@@ -21,6 +22,7 @@ export default function WorksPage() {
   const [editingWork, setEditingWork] = useState<Work | undefined>();
   const [deletingWork, setDeletingWork] = useState<Work | undefined>();
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showReceiptGenerator, setShowReceiptGenerator] = useState(false);
   
   const deleteWork = useMutation(api.works.deleteWork);
 
@@ -68,8 +70,22 @@ export default function WorksPage() {
       toast.error("Please select at least one work transaction");
       return;
     }
-    // TODO: Implement receipt generation
-    toast.info("Receipt generation will be implemented in a future task");
+    setShowReceiptGenerator(true);
+  };
+
+  const handleCloseReceiptGenerator = () => {
+    setShowReceiptGenerator(false);
+  };
+
+  const handlePDFGeneration = async () => {
+    try {
+      toast.success("Receipt generated successfully!");
+      setShowReceiptGenerator(false);
+      setSelectedWorks([]);
+    } catch (error) {
+      toast.error("Failed to generate receipt");
+      console.error("Error generating receipt:", error);
+    }
   };
 
   return (
@@ -112,6 +128,15 @@ export default function WorksPage() {
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {/* Receipt Generator */}
+        {showReceiptGenerator && (
+          <ReceiptGenerator
+            selectedWorkIds={selectedWorks}
+            onClose={handleCloseReceiptGenerator}
+            onGenerateReceipt={handlePDFGeneration}
+          />
         )}
 
         {/* Work List */}

@@ -31,9 +31,7 @@ import {
   Plus,
   Calendar,
   FileText,
-  AlertCircle,
-  CheckCircle,
-  Clock
+  CheckCircle
 } from 'lucide-react'
 
 interface ClientBalanceHistoryProps {
@@ -165,7 +163,7 @@ export function ClientBalanceHistory({ clientId }: ClientBalanceHistoryProps) {
 
               {/* Timeline */}
               <div className="space-y-3">
-                {balanceTimeline.timeline.slice(0, showFullHistory ? undefined : 10).map((entry, index) => (
+                {balanceTimeline.timeline.slice(0, showFullHistory ? undefined : 10).map((entry) => (
                   <div key={entry._id} className="flex items-start space-x-3 p-3 border rounded-lg">
                     <div className="flex-shrink-0 mt-1">
                       {getChangeIcon(entry.changeType, entry.balanceChange)}

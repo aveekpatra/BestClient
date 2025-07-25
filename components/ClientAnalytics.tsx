@@ -194,7 +194,7 @@ export default function ClientAnalytics({ dateFrom, dateTo }: ClientAnalyticsPro
                     cy="50%"
                     labelLine={false}
                     label={({ workType, percent }) => 
-                      `${formatWorkType(workType)} ${(percent * 100).toFixed(0)}%`
+                      `${formatWorkType(workType)} ${((percent || 0) * 100).toFixed(0)}%`
                     }
                     outerRadius={80}
                     fill="#8884d8"

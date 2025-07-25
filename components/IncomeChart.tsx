@@ -210,7 +210,7 @@ export default function IncomeChart({ dateFrom, dateTo }: IncomeChartProps) {
                       cy="50%"
                       labelLine={false}
                       label={({ workType, percent }) => 
-                        `${formatWorkType(workType)} ${(percent * 100).toFixed(0)}%`
+                        `${formatWorkType(workType)} ${((percent || 0) * 100).toFixed(0)}%`
                       }
                       outerRadius={80}
                       fill="#8884d8"
@@ -266,7 +266,7 @@ export default function IncomeChart({ dateFrom, dateTo }: IncomeChartProps) {
                       </td>
                       <td className="p-2 text-right">{item.count}</td>
                       <td className="p-2 text-right">
-                        {formatCurrency(item.averageValue)}
+                        {formatCurrency(item.count > 0 ? item.total / item.count : 0)}
                       </td>
                     </tr>
                   ))}

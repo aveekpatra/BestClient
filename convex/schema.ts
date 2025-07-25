@@ -52,4 +52,23 @@ export default defineSchema({
     .index("by_date", ["transactionDate"])
     .index("by_payment_status", ["paymentStatus"])
     .index("by_work_type", ["workType"]),
+
+  balanceHistory: defineTable({
+    clientId: v.id("clients"),
+    workId: v.optional(v.id("works")), // Associated work transaction if applicable
+    previousBalance: v.number(),
+    newBalance: v.number(),
+    balanceChange: v.number(),
+    changeType: v.union(
+      v.literal("work_created"),
+      v.literal("work_updated"),
+      v.literal("work_deleted"),
+      v.literal("manual_adjustment"),
+      v.literal("balance_correction")
+    ),
+    description: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_client", ["clientId"])
+    .index("by_client_date", ["clientId", "createdAt"]),
 });

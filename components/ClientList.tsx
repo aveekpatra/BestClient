@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { useQuery } from 'convex/react'
+import { useQuery, useMutation } from 'convex/react'
 import { api } from '../convex/_generated/api'
+import { Id } from '../convex/_generated/dataModel'
 import {
   Table,
   TableBody,
@@ -57,10 +58,14 @@ export function ClientList({ onClientSelect, onClientEdit, onClientCreate }: Cli
   const [workTypeFilter, setWorkTypeFilter] = useState<WorkType | 'all'>('all')
   const [balanceMin, setBalanceMin] = useState<string>('')
   const [balanceMax, setBalanceMax] = useState<string>('')
+  const [balanceTypeFilter, setBalanceTypeFilter] = useState<'all' | 'positive' | 'negative' | 'zero'>('all')
   const [sortField, setSortField] = useState<SortField>('name')
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc')
   const [currentPage, setCurrentPage] = useState(0)
   const [deleteClientId, setDeleteClientId] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  const deleteClient = useMutation(api.clients.deleteClient)
 
   const pageSize = 20
 
@@ -76,6 +81,7 @@ export function ClientList({ onClientSelect, onClientEdit, onClientCreate }: Cli
     sortBy: sortField,
     sortOrder,
     workTypeFilter: workTypeFilter === 'all' ? undefined : workTypeFilter,
+    balanceTypeFilter: balanceTypeFilter === 'all' ? undefined : balanceTypeFilter,
     balanceMin: balanceMin ? parseFloat(balanceMin) * 100 : undefined, // Convert to paise
     balanceMax: balanceMax ? parseFloat(balanceMax) * 100 : undefined, // Convert to paise
     searchTerm: searchTerm || undefined,
@@ -100,6 +106,7 @@ export function ClientList({ onClientSelect, onClientEdit, onClientCreate }: Cli
     setWorkTypeFilter('all')
     setBalanceMin('')
     setBalanceMax('')
+    setBalanceTypeFilter('all')
     setSortField('name')
     setSortOrder('asc')
     setCurrentPage(0)
@@ -136,7 +143,7 @@ export function ClientList({ onClientSelect, onClientEdit, onClientCreate }: Cli
     )
   }
 
-  const { clients, total, hasMore } = clientsData
+  const { total, hasMore } = clientsData || { clients: [], total: 0, hasMore: false }
 
   return (
     <div className="space-y-6">
@@ -162,7 +169,7 @@ export function ClientList({ onClientSelect, onClientEdit, onClientCreate }: Cli
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             {/* Search */}
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
@@ -192,6 +199,25 @@ export function ClientList({ onClientSelect, onClientEdit, onClientCreate }: Cli
                 <SelectItem value="income-tax">Income Tax</SelectItem>
                 <SelectItem value="mutual-funds">Mutual Funds</SelectItem>
                 <SelectItem value="others">Others</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Balance Type Filter */}
+            <Select
+              value={balanceTypeFilter}
+              onValueChange={(value: 'all' | 'positive' | 'negative' | 'zero') => {
+                setBalanceTypeFilter(value)
+                handleFilterChange()
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Balance Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Balances</SelectItem>
+                <SelectItem value="positive">Client Owes (₹+)</SelectItem>
+                <SelectItem value="negative">You Owe (₹-)</SelectItem>
+                <SelectItem value="zero">Balanced (₹0)</SelectItem>
               </SelectContent>
             </Select>
 
@@ -227,7 +253,7 @@ export function ClientList({ onClientSelect, onClientEdit, onClientCreate }: Cli
       {/* Results */}
       <Card>
         <CardContent className="p-0">
-          {clients.length === 0 ? (
+          {!clientsData?.clients || clientsData.clients.length === 0 ? (
             <div className="p-8 text-center text-gray-500">
               <User className="h-12 w-12 mx-auto mb-4 text-gray-300" />
               <p className="text-lg font-medium">No clients found</p>
@@ -262,7 +288,7 @@ export function ClientList({ onClientSelect, onClientEdit, onClientCreate }: Cli
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {clients.map((client) => (
+                  {clientsData?.clients?.map((client) => (
                     <TableRow 
                       key={client._id}
                       className="cursor-pointer hover:bg-gray-50"
@@ -374,18 +400,32 @@ export function ClientList({ onClientSelect, onClientEdit, onClientCreate }: Cli
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteClientId(null)}>
+            <Button 
+              variant="outline" 
+              disabled={isDeleting}
+              onClick={() => setDeleteClientId(null)}
+            >
               Cancel
             </Button>
             <Button 
               variant="destructive" 
-              onClick={() => {
-                // TODO: Implement delete functionality
-                console.log('Delete client:', deleteClientId)
-                setDeleteClientId(null)
+              disabled={isDeleting}
+              onClick={async () => {
+                if (!deleteClientId) return
+                
+                setIsDeleting(true)
+                try {
+                  await deleteClient({ id: deleteClientId as Id<"clients"> })
+                  setDeleteClientId(null)
+                } catch (error) {
+                  console.error('Failed to delete client:', error)
+                  // TODO: Show error toast
+                } finally {
+                  setIsDeleting(false)
+                }
               }}
             >
-              Delete
+              {isDeleting ? 'Deleting...' : 'Delete'}
             </Button>
           </DialogFooter>
         </DialogContent>

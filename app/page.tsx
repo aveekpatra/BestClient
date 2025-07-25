@@ -1,8 +1,8 @@
 "use client";
 
-import AppLayout from "@/components/AppLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import AppLayout from "../components/AppLayout";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { Button } from "../components/ui/button";
 import { Users, FileText, BarChart3 } from "lucide-react";
 import Link from "next/link";
 

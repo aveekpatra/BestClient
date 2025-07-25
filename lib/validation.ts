@@ -86,6 +86,28 @@ export function validateAddress(address: string): boolean {
 }
 
 /**
+ * Validates work description
+ */
+export function validateDescription(description: string): boolean {
+  if (!description) return false;
+  return description.trim().length >= 5 && description.trim().length <= 500;
+}
+
+/**
+ * Validates amount (in paise)
+ */
+export function validateAmount(amount: number): boolean {
+  return amount >= 0 && amount <= 10000000000; // Max 1 crore rupees in paise
+}
+
+/**
+ * Validates that paid amount doesn't exceed total price
+ */
+export function validatePaymentAmount(totalPrice: number, paidAmount: number): boolean {
+  return paidAmount >= 0 && paidAmount <= totalPrice;
+}
+
+/**
  * Comprehensive client validation
  */
 export interface ClientValidationResult {
@@ -130,6 +152,48 @@ export function validateClientData(data: {
 
   if (data.aadharNumber && !validateAadhar(data.aadharNumber)) {
     errors.aadharNumber = "Aadhar must be 12 digits";
+  }
+
+  return {
+    isValid: Object.keys(errors).length === 0,
+    errors
+  };
+}
+
+/**
+ * Comprehensive work validation
+ */
+export interface WorkValidationResult {
+  isValid: boolean;
+  errors: Record<string, string>;
+}
+
+export function validateWorkData(data: {
+  transactionDate: string;
+  totalPrice: number;
+  paidAmount: number;
+  description: string;
+}): WorkValidationResult {
+  const errors: Record<string, string> = {};
+
+  if (!validateDate(data.transactionDate)) {
+    errors.transactionDate = "Date must be in DD/MM/YYYY format and valid";
+  }
+
+  if (!validateAmount(data.totalPrice)) {
+    errors.totalPrice = "Total price must be a valid amount";
+  }
+
+  if (!validateAmount(data.paidAmount)) {
+    errors.paidAmount = "Paid amount must be a valid amount";
+  }
+
+  if (!validatePaymentAmount(data.totalPrice, data.paidAmount)) {
+    errors.paidAmount = "Paid amount cannot exceed total price";
+  }
+
+  if (!validateDescription(data.description)) {
+    errors.description = "Description must be between 5 and 500 characters";
   }
 
   return {

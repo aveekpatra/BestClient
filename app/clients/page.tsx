@@ -3,15 +3,17 @@
 import { useState } from 'react'
 import AppLayout from '../../components/AppLayout'
 import { ClientList } from '../../components/ClientList'
-import { ClientForm } from '../../components/ClientForm'
+import { ClientFormModal } from '../../components/ClientFormModal'
 import { ClientDetails } from '../../components/ClientDetails'
 import { Id } from '../../convex/_generated/dataModel'
 
-type View = 'list' | 'create' | 'edit' | 'details'
+type View = 'list' | 'details'
 
 export default function ClientsPage() {
   const [currentView, setCurrentView] = useState<View>('list')
   const [selectedClientId, setSelectedClientId] = useState<Id<"clients"> | null>(null)
+  const [isFormModalOpen, setIsFormModalOpen] = useState(false)
+  const [editingClientId, setEditingClientId] = useState<Id<"clients"> | undefined>(undefined)
 
   const handleClientSelect = (clientId: string) => {
     setSelectedClientId(clientId as Id<"clients">)
@@ -19,34 +21,34 @@ export default function ClientsPage() {
   }
 
   const handleClientEdit = (clientId: string) => {
-    setSelectedClientId(clientId as Id<"clients">)
-    setCurrentView('edit')
+    setEditingClientId(clientId as Id<"clients">)
+    setIsFormModalOpen(true)
   }
 
   const handleClientCreate = () => {
-    setSelectedClientId(null)
-    setCurrentView('create')
+    setEditingClientId(undefined)
+    setIsFormModalOpen(true)
   }
 
-  const handleFormSave = (clientId: Id<"clients">) => {
+  const handleFormSuccess = (clientId: Id<"clients">) => {
     setSelectedClientId(clientId)
     setCurrentView('details')
-  }
-
-  const handleFormCancel = () => {
-    setCurrentView('list')
+    setIsFormModalOpen(false)
   }
 
   const handleDetailsEdit = () => {
-    setCurrentView('edit')
+    setEditingClientId(selectedClientId!)
+    setIsFormModalOpen(true)
   }
 
   const handleDetailsDelete = () => {
     setCurrentView('list')
+    setSelectedClientId(null)
   }
 
   const handleDetailsClose = () => {
     setCurrentView('list')
+    setSelectedClientId(null)
   }
 
   return (
@@ -59,14 +61,6 @@ export default function ClientsPage() {
         />
       )}
 
-      {(currentView === 'create' || currentView === 'edit') && (
-        <ClientForm
-          clientId={currentView === 'edit' ? selectedClientId! : undefined}
-          onSave={handleFormSave}
-          onCancel={handleFormCancel}
-        />
-      )}
-
       {currentView === 'details' && selectedClientId && (
         <ClientDetails
           clientId={selectedClientId}
@@ -75,6 +69,13 @@ export default function ClientsPage() {
           onClose={handleDetailsClose}
         />
       )}
+
+      <ClientFormModal
+        open={isFormModalOpen}
+        onOpenChange={setIsFormModalOpen}
+        clientId={editingClientId}
+        onSuccess={handleFormSuccess}
+      />
     </AppLayout>
   )
 }

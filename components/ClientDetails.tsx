@@ -34,6 +34,7 @@ import {
   getWorkTypeLabel,
   getPaymentStatusInfo
 } from '../lib/utils'
+import { ClientBalanceHistory } from './ClientBalanceHistory'
 import { 
   User, 
   Phone, 
@@ -45,7 +46,11 @@ import {
   Trash2, 
   Calendar,
   IndianRupee,
-  History
+  History,
+  AlertTriangle,
+  Clock,
+  TrendingUp,
+  TrendingDown
 } from 'lucide-react'
 
 interface ClientDetailsProps {
@@ -58,6 +63,7 @@ interface ClientDetailsProps {
 export function ClientDetails({ clientId, onEdit, onDelete, onClose }: ClientDetailsProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'balance'>('overview')
 
   const client = useQuery(api.clients.getClientById, { id: clientId })
   const clientWorks = useQuery(api.works.getWorksByClient, { clientId })
@@ -115,6 +121,45 @@ export function ClientDetails({ clientId, onEdit, onDelete, onClose }: ClientDet
 
   const balanceInfo = getBalanceInfo(client.balance)
 
+  // Helper function to check if work is overdue (unpaid/partial after 30 days)
+  const isWorkOverdue = (work: any) => {
+    if (work.paymentStatus === 'paid') return false
+    
+    const workDate = new Date(work.transactionDate.split('/').reverse().join('-'))
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+    
+    return workDate < thirtyDaysAgo
+  }
+
+  // Calculate running balance for work history
+  const getWorkHistoryWithRunningBalance = () => {
+    if (!clientWorks) return []
+    
+    // Sort works by date (oldest first) for running balance calculation
+    const sortedWorks = [...clientWorks].sort((a, b) => {
+      const dateA = new Date(a.transactionDate.split('/').reverse().join('-'))
+      const dateB = new Date(b.transactionDate.split('/').reverse().join('-'))
+      return dateA.getTime() - dateB.getTime()
+    })
+
+    let runningBalance = 0
+    return sortedWorks.map(work => {
+      const workBalance = work.totalPrice - work.paidAmount
+      runningBalance += workBalance
+      
+      return {
+        ...work,
+        workBalance,
+        runningBalance,
+        isOverdue: isWorkOverdue(work)
+      }
+    }).reverse() // Show newest first in the table
+  }
+
+  const workHistoryWithBalance = getWorkHistoryWithRunningBalance()
+  const overdueWorks = workHistoryWithBalance.filter(work => work.isOverdue)
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -162,187 +207,289 @@ export function ClientDetails({ clientId, onEdit, onDelete, onClose }: ClientDet
                 </p>
               </div>
             </div>
-            <Badge variant="outline" className={balanceInfo.color}>
-              {client.balance > 0 ? 'Receivable' : client.balance < 0 ? 'Payable' : 'Clear'}
-            </Badge>
+            <div className="text-right">
+              <Badge variant="outline" className={balanceInfo.color}>
+                {client.balance > 0 ? 'Receivable' : client.balance < 0 ? 'Payable' : 'Clear'}
+              </Badge>
+              {overdueWorks.length > 0 && (
+                <div className="flex items-center space-x-1 mt-2 text-orange-600">
+                  <AlertTriangle className="h-4 w-4" />
+                  <span className="text-sm">{overdueWorks.length} overdue</span>
+                </div>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Personal Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <User className="h-5 w-5" />
-              <span>Personal Information</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center space-x-3">
-              <Calendar className="h-4 w-4 text-gray-400" />
-              <div>
-                <p className="text-sm text-gray-500">Date of Birth</p>
-                <p className="font-medium">{client.dateOfBirth}</p>
-              </div>
-            </div>
-            
-            <div className="flex items-start space-x-3">
-              <MapPin className="h-4 w-4 text-gray-400 mt-1" />
-              <div>
-                <p className="text-sm text-gray-500">Address</p>
-                <p className="font-medium">{client.address}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Contact Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Phone className="h-5 w-5" />
-              <span>Contact Information</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center space-x-3">
-              <Phone className="h-4 w-4 text-gray-400" />
-              <div>
-                <p className="text-sm text-gray-500">Phone</p>
-                <p className="font-medium">{formatPhone(client.phone)}</p>
-              </div>
-            </div>
-            
-            {client.email && (
-              <div className="flex items-center space-x-3">
-                <Mail className="h-4 w-4 text-gray-400" />
-                <div>
-                  <p className="text-sm text-gray-500">Email</p>
-                  <p className="font-medium">{client.email}</p>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Documents */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <FileText className="h-5 w-5" />
-              <span>Documents</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {client.panNumber && (
-              <div className="flex items-center space-x-3">
-                <CreditCard className="h-4 w-4 text-gray-400" />
-                <div>
-                  <p className="text-sm text-gray-500">PAN Number</p>
-                  <p className="font-medium font-mono">{formatPAN(client.panNumber)}</p>
-                </div>
-              </div>
-            )}
-            
-            {client.aadharNumber && (
-              <div className="flex items-center space-x-3">
-                <CreditCard className="h-4 w-4 text-gray-400" />
-                <div>
-                  <p className="text-sm text-gray-500">Aadhar Number</p>
-                  <p className="font-medium font-mono">{formatAadhar(client.aadharNumber)}</p>
-                </div>
-              </div>
-            )}
-
-            {!client.panNumber && !client.aadharNumber && (
-              <p className="text-gray-500 text-sm">No documents on file</p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Business Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <User className="h-5 w-5" />
-              <span>Business Information</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <p className="text-sm text-gray-500">Usual Work Type</p>
-              <Badge variant="outline" className="mt-1">
-                {getWorkTypeLabel(client.usualWorkType)}
-              </Badge>
-            </div>
-            
-            <div>
-              <p className="text-sm text-gray-500">Client Since</p>
-              <p className="font-medium">{formatDate(new Date(client.createdAt))}</p>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Navigation Tabs */}
+      <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+        <button
+          onClick={() => setActiveTab('overview')}
+          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+            activeTab === 'overview'
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Overview
+        </button>
+        <button
+          onClick={() => setActiveTab('history')}
+          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+            activeTab === 'history'
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Work History
+        </button>
+        <button
+          onClick={() => setActiveTab('balance')}
+          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+            activeTab === 'balance'
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Balance History
+        </button>
       </div>
 
-      {/* Work History */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <History className="h-5 w-5" />
-            <span>Work History</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {clientWorks === undefined ? (
-            <div className="space-y-2">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
-            </div>
-          ) : clientWorks === null || clientWorks.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <History className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-              <p>No work history found</p>
-              <p className="text-sm">Work transactions will appear here</p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Work Type</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {clientWorks.map((work) => {
-                  const statusInfo = getPaymentStatusInfo(work.paymentStatus)
-                  return (
-                    <TableRow key={work._id}>
-                      <TableCell>{work.transactionDate}</TableCell>
-                      <TableCell>{work.description}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {getWorkTypeLabel(work.workType)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{formatCurrency(work.totalPrice)}</TableCell>
-                      <TableCell>
-                        <Badge className={statusInfo.colorClass}>
-                          {statusInfo.label}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      {/* Tab Content */}
+      {activeTab === 'overview' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Personal Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <User className="h-5 w-5" />
+                <span>Personal Information</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center space-x-3">
+                <Calendar className="h-4 w-4 text-gray-400" />
+                <div>
+                  <p className="text-sm text-gray-500">Date of Birth</p>
+                  <p className="font-medium">{client.dateOfBirth}</p>
+                </div>
+              </div>
+              
+              <div className="flex items-start space-x-3">
+                <MapPin className="h-4 w-4 text-gray-400 mt-1" />
+                <div>
+                  <p className="text-sm text-gray-500">Address</p>
+                  <p className="font-medium">{client.address}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Contact Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Phone className="h-5 w-5" />
+                <span>Contact Information</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center space-x-3">
+                <Phone className="h-4 w-4 text-gray-400" />
+                <div>
+                  <p className="text-sm text-gray-500">Phone</p>
+                  <p className="font-medium">{formatPhone(client.phone)}</p>
+                </div>
+              </div>
+              
+              {client.email && (
+                <div className="flex items-center space-x-3">
+                  <Mail className="h-4 w-4 text-gray-400" />
+                  <div>
+                    <p className="text-sm text-gray-500">Email</p>
+                    <p className="font-medium">{client.email}</p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Documents */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <FileText className="h-5 w-5" />
+                <span>Documents</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {client.panNumber && (
+                <div className="flex items-center space-x-3">
+                  <CreditCard className="h-4 w-4 text-gray-400" />
+                  <div>
+                    <p className="text-sm text-gray-500">PAN Number</p>
+                    <p className="font-medium font-mono">{formatPAN(client.panNumber)}</p>
+                  </div>
+                </div>
+              )}
+              
+              {client.aadharNumber && (
+                <div className="flex items-center space-x-3">
+                  <CreditCard className="h-4 w-4 text-gray-400" />
+                  <div>
+                    <p className="text-sm text-gray-500">Aadhar Number</p>
+                    <p className="font-medium font-mono">{formatAadhar(client.aadharNumber)}</p>
+                  </div>
+                </div>
+              )}
+
+              {!client.panNumber && !client.aadharNumber && (
+                <p className="text-gray-500 text-sm">No documents on file</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Business Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <User className="h-5 w-5" />
+                <span>Business Information</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="text-sm text-gray-500">Usual Work Type</p>
+                <Badge variant="outline" className="mt-1">
+                  {getWorkTypeLabel(client.usualWorkType)}
+                </Badge>
+              </div>
+              
+              <div>
+                <p className="text-sm text-gray-500">Client Since</p>
+                <p className="font-medium">{formatDate(new Date(client.createdAt))}</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {activeTab === 'history' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <History className="h-5 w-5" />
+                <span>Work History</span>
+                {clientWorks && (
+                  <Badge variant="secondary">{clientWorks.length} transactions</Badge>
+                )}
+              </div>
+              {overdueWorks.length > 0 && (
+                <Badge variant="destructive" className="flex items-center space-x-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  <span>{overdueWorks.length} overdue</span>
+                </Badge>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {clientWorks === undefined ? (
+              <div className="space-y-2">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : clientWorks === null || clientWorks.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <History className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                <p>No work history found</p>
+                <p className="text-sm">Work transactions will appear here</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Work Type</TableHead>
+                    <TableHead>Total</TableHead>
+                    <TableHead>Paid</TableHead>
+                    <TableHead>Balance</TableHead>
+                    <TableHead>Running Total</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {workHistoryWithBalance.map((work) => {
+                    const statusInfo = getPaymentStatusInfo(work.paymentStatus)
+                    return (
+                      <TableRow 
+                        key={work._id}
+                        className={work.isOverdue ? 'bg-orange-50 border-l-4 border-l-orange-400' : ''}
+                      >
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            {work.isOverdue && (
+                              <AlertTriangle className="h-4 w-4 text-orange-500" />
+                            )}
+                            <span>{work.transactionDate}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <p>{work.description}</p>
+                            {work.isOverdue && (
+                              <p className="text-xs text-orange-600 flex items-center space-x-1 mt-1">
+                                <Clock className="h-3 w-3" />
+                                <span>Overdue</span>
+                              </p>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {getWorkTypeLabel(work.workType)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{formatCurrency(work.totalPrice)}</TableCell>
+                        <TableCell>{formatCurrency(work.paidAmount)}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-1">
+                            {work.workBalance > 0 ? (
+                              <TrendingUp className="h-3 w-3 text-green-600" />
+                            ) : work.workBalance < 0 ? (
+                              <TrendingDown className="h-3 w-3 text-red-600" />
+                            ) : null}
+                            <span className={work.workBalance > 0 ? 'text-green-600' : work.workBalance < 0 ? 'text-red-600' : 'text-gray-600'}>
+                              {formatCurrency(Math.abs(work.workBalance))}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className={work.runningBalance > 0 ? 'text-green-600 font-medium' : work.runningBalance < 0 ? 'text-red-600 font-medium' : 'text-gray-600'}>
+                            {formatCurrency(Math.abs(work.runningBalance))}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={statusInfo.colorClass}>
+                            {statusInfo.label}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {activeTab === 'balance' && (
+        <ClientBalanceHistory clientId={clientId} />
+      )}
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

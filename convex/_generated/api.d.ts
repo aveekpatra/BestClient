@@ -13,7 +13,9 @@ import type {
   FilterApi,
   FunctionReference,
 } from "convex/server";
+import type * as analytics from "../analytics.js";
 import type * as auth from "../auth.js";
+import type * as balanceHistory from "../balanceHistory.js";
 import type * as clients from "../clients.js";
 import type * as http from "../http.js";
 import type * as works from "../works.js";
@@ -27,7 +29,9 @@ import type * as works from "../works.js";
  * ```
  */
 declare const fullApi: ApiFromModules<{
+  analytics: typeof analytics;
   auth: typeof auth;
+  balanceHistory: typeof balanceHistory;
   clients: typeof clients;
   http: typeof http;
   works: typeof works;

@@ -242,6 +242,11 @@ export const getClients = query({
       v.literal("mutual-funds"),
       v.literal("others")
     )),
+    balanceTypeFilter: v.optional(v.union(
+      v.literal("positive"),
+      v.literal("negative"),
+      v.literal("zero")
+    )),
     balanceMin: v.optional(v.number()),
     balanceMax: v.optional(v.number()),
     searchTerm: v.optional(v.string()),
@@ -270,6 +275,22 @@ export const getClients = query({
         client.phone.includes(args.searchTerm!) ||
         (client.email && client.email.toLowerCase().includes(searchLower))
       );
+    }
+
+    // Apply balance type filter
+    if (args.balanceTypeFilter) {
+      results = results.filter(client => {
+        switch (args.balanceTypeFilter) {
+          case "positive":
+            return client.balance > 0;
+          case "negative":
+            return client.balance < 0;
+          case "zero":
+            return client.balance === 0;
+          default:
+            return true;
+        }
+      });
     }
 
     // Apply balance range filter
@@ -442,5 +463,101 @@ export const searchClients = query({
       client.phone.includes(args.searchTerm) ||
       (client.email && client.email.toLowerCase().includes(searchLower))
     );
+  },
+});
+
+// Get clients by balance type (positive, negative, zero)
+export const getClientsByBalanceType = query({
+  args: {
+    balanceType: v.union(
+      v.literal("positive"), // Client owes business
+      v.literal("negative"), // Business owes client
+      v.literal("zero")      // Balanced
+    ),
+  },
+  handler: async (ctx, args) => {
+    const clients = await ctx.db.query("clients").collect();
+    
+    return clients.filter(client => {
+      switch (args.balanceType) {
+        case "positive":
+          return client.balance > 0;
+        case "negative":
+          return client.balance < 0;
+        case "zero":
+          return client.balance === 0;
+        default:
+          return false;
+      }
+    });
+  },
+});
+
+// Validate balance consistency for a client
+export const validateClientBalance = query({
+  args: { clientId: v.id("clients") },
+  handler: async (ctx, args) => {
+    const client = await ctx.db.get(args.clientId);
+    if (!client) {
+      throw new Error("Client not found");
+    }
+
+    // Get all works for this client
+    const works = await ctx.db
+      .query("works")
+      .withIndex("by_client", (q) => q.eq("clientId", args.clientId))
+      .collect();
+
+    // Calculate expected balance from works
+    const calculatedBalance = works.reduce((sum, work) => {
+      return sum + (work.totalPrice - work.paidAmount);
+    }, 0);
+
+    return {
+      clientId: args.clientId,
+      storedBalance: client.balance,
+      calculatedBalance,
+      isConsistent: client.balance === calculatedBalance,
+      difference: client.balance - calculatedBalance,
+    };
+  },
+});
+
+// Fix balance inconsistencies for all clients
+export const fixAllBalanceInconsistencies = mutation({
+  handler: async (ctx) => {
+    const clients = await ctx.db.query("clients").collect();
+    const fixes = [];
+
+    for (const client of clients) {
+      // Get all works for this client
+      const works = await ctx.db
+        .query("works")
+        .withIndex("by_client", (q) => q.eq("clientId", client._id))
+        .collect();
+
+      // Calculate correct balance
+      const correctBalance = works.reduce((sum, work) => {
+        return sum + (work.totalPrice - work.paidAmount);
+      }, 0);
+
+      // Update if inconsistent
+      if (client.balance !== correctBalance) {
+        await ctx.db.patch(client._id, {
+          balance: correctBalance,
+          updatedAt: Date.now(),
+        });
+
+        fixes.push({
+          clientId: client._id,
+          clientName: client.name,
+          oldBalance: client.balance,
+          newBalance: correctBalance,
+          difference: correctBalance - client.balance,
+        });
+      }
+    }
+
+    return fixes;
   },
 });

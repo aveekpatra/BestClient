@@ -1,0 +1,313 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useQuery } from "convex/react";
+import { api } from "../convex/_generated/api";
+import { Id } from "../convex/_generated/dataModel";
+import { Work, WorkType, WorkFormData } from "../lib/types";
+import { validateWorkData } from "../lib/validation";
+import { formatCurrency, rupeesToPaise, paiseToRupees, getCurrentDate } from "../lib/utils";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Textarea } from "./ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Alert, AlertDescription } from "./ui/alert";
+import { Loader2, Calculator } from "lucide-react";
+
+interface WorkFormProps {
+  work?: Work;
+  onSubmit: (data: WorkFormData) => Promise<void>;
+  onCancel: () => void;
+  isSubmitting?: boolean;
+}
+
+export default function WorkForm({ work, onSubmit, onCancel, isSubmitting = false }: WorkFormProps) {
+  const [formData, setFormData] = useState<WorkFormData>({
+    clientId: work?.clientId || ("" as Id<"clients">),
+    transactionDate: work?.transactionDate || getCurrentDate(),
+    totalPrice: work?.totalPrice || 0,
+    paidAmount: work?.paidAmount || 0,
+    workType: work?.workType || "online-work",
+    description: work?.description || "",
+  });
+
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [totalPriceRupees, setTotalPriceRupees] = useState(
+    work ? paiseToRupees(work.totalPrice).toString() : ""
+  );
+  const [paidAmountRupees, setPaidAmountRupees] = useState(
+    work ? paiseToRupees(work.paidAmount).toString() : ""
+  );
+
+  // Fetch clients for dropdown
+  const clientsData = useQuery(api.clients.getClients, {});
+
+  // Calculate balance and payment status
+  const balance = formData.totalPrice - formData.paidAmount;
+  const paymentStatus = 
+    formData.paidAmount >= formData.totalPrice ? "paid" :
+    formData.paidAmount > 0 ? "partial" : "unpaid";
+
+  // Update form data when amounts change
+  useEffect(() => {
+    const totalPaise = totalPriceRupees ? rupeesToPaise(parseFloat(totalPriceRupees) || 0) : 0;
+    const paidPaise = paidAmountRupees ? rupeesToPaise(parseFloat(paidAmountRupees) || 0) : 0;
+    
+    setFormData(prev => ({
+      ...prev,
+      totalPrice: totalPaise,
+      paidAmount: paidPaise,
+    }));
+  }, [totalPriceRupees, paidAmountRupees]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validate form data
+    const validation = validateWorkData({
+      transactionDate: formData.transactionDate,
+      totalPrice: formData.totalPrice,
+      paidAmount: formData.paidAmount,
+      description: formData.description,
+    });
+
+    // Additional validations
+    const newErrors: Record<string, string> = { ...validation.errors };
+    
+    if (!formData.clientId) {
+      newErrors.clientId = "Please select a client";
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
+    setErrors({});
+    
+    try {
+      await onSubmit(formData);
+    } catch (error) {
+      console.error("Error submitting work form:", error);
+      setErrors({ submit: "Failed to save work. Please try again." });
+    }
+  };
+
+  const handleInputChange = (field: keyof WorkFormData, value: string | WorkType | Id<"clients">) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    // Clear error when user starts typing
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: "" }));
+    }
+  };
+
+  const handleAmountChange = (field: "totalPrice" | "paidAmount", value: string) => {
+    // Only allow valid number input
+    if (value === "" || /^\d*\.?\d*$/.test(value)) {
+      if (field === "totalPrice") {
+        setTotalPriceRupees(value);
+      } else {
+        setPaidAmountRupees(value);
+      }
+      
+      // Clear error when user starts typing
+      if (errors[field]) {
+        setErrors(prev => ({ ...prev, [field]: "" }));
+      }
+    }
+  };
+
+  if (!clientsData?.clients) {
+    return (
+      <Card>
+        <CardContent className="py-8">
+          <div className="flex items-center justify-center">
+            <Loader2 className="h-6 w-6 animate-spin mr-2" />
+            Loading clients...
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{work ? "Edit Work Transaction" : "Add New Work Transaction"}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {errors.submit && (
+            <Alert variant="destructive">
+              <AlertDescription>{errors.submit}</AlertDescription>
+            </Alert>
+          )}
+
+          {/* Client Selection */}
+          <div className="space-y-2">
+            <Label htmlFor="clientId">Client *</Label>
+            <Select
+              value={formData.clientId}
+              onValueChange={(value) => handleInputChange("clientId", value as Id<"clients">)}
+            >
+              <SelectTrigger className={errors.clientId ? "border-red-500" : ""}>
+                <SelectValue placeholder="Select a client" />
+              </SelectTrigger>
+              <SelectContent>
+                {clientsData.clients.map((client) => (
+                  <SelectItem key={client._id} value={client._id}>
+                    {client.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.clientId && (
+              <p className="text-sm text-red-500">{errors.clientId}</p>
+            )}
+          </div>
+
+          {/* Transaction Date */}
+          <div className="space-y-2">
+            <Label htmlFor="transactionDate">Transaction Date *</Label>
+            <Input
+              id="transactionDate"
+              type="date"
+              value={formData.transactionDate.split('/').reverse().join('-')} // Convert DD/MM/YYYY to YYYY-MM-DD for input
+              onChange={(e) => {
+                // Convert YYYY-MM-DD back to DD/MM/YYYY
+                const [year, month, day] = e.target.value.split('-');
+                const ddmmyyyy = `${day}/${month}/${year}`;
+                handleInputChange("transactionDate", ddmmyyyy);
+              }}
+              className={errors.transactionDate ? "border-red-500" : ""}
+            />
+            {errors.transactionDate && (
+              <p className="text-sm text-red-500">{errors.transactionDate}</p>
+            )}
+          </div>
+
+          {/* Work Type */}
+          <div className="space-y-2">
+            <Label htmlFor="workType">Work Type *</Label>
+            <Select
+              value={formData.workType}
+              onValueChange={(value) => handleInputChange("workType", value as WorkType)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="online-work">Online Work</SelectItem>
+                <SelectItem value="health-insurance">Health Insurance</SelectItem>
+                <SelectItem value="life-insurance">Life Insurance</SelectItem>
+                <SelectItem value="income-tax">Income Tax</SelectItem>
+                <SelectItem value="mutual-funds">Mutual Funds</SelectItem>
+                <SelectItem value="others">Others</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Amount Fields */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="totalPrice">Total Price (₹) *</Label>
+              <Input
+                id="totalPrice"
+                type="text"
+                placeholder="0.00"
+                value={totalPriceRupees}
+                onChange={(e) => handleAmountChange("totalPrice", e.target.value)}
+                className={errors.totalPrice ? "border-red-500" : ""}
+              />
+              {errors.totalPrice && (
+                <p className="text-sm text-red-500">{errors.totalPrice}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="paidAmount">Paid Amount (₹) *</Label>
+              <Input
+                id="paidAmount"
+                type="text"
+                placeholder="0.00"
+                value={paidAmountRupees}
+                onChange={(e) => handleAmountChange("paidAmount", e.target.value)}
+                className={errors.paidAmount ? "border-red-500" : ""}
+              />
+              {errors.paidAmount && (
+                <p className="text-sm text-red-500">{errors.paidAmount}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Balance Calculation Display */}
+          {(formData.totalPrice > 0 || formData.paidAmount > 0) && (
+            <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <Calculator className="h-4 w-4" />
+                <span className="font-medium">Calculation Summary</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div>
+                  <span className="text-gray-600">Total Price:</span>
+                  <div className="font-medium">{formatCurrency(formData.totalPrice)}</div>
+                </div>
+                <div>
+                  <span className="text-gray-600">Paid Amount:</span>
+                  <div className="font-medium">{formatCurrency(formData.paidAmount)}</div>
+                </div>
+                <div>
+                  <span className="text-gray-600">Balance:</span>
+                  <div className={`font-medium ${balance > 0 ? "text-red-600" : balance < 0 ? "text-green-600" : ""}`}>
+                    {formatCurrency(Math.abs(balance))}
+                    {balance > 0 && " (Due)"}
+                    {balance < 0 && " (Overpaid)"}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-2">
+                <span className="text-gray-600">Payment Status:</span>
+                <span className={`ml-2 px-2 py-1 rounded text-xs font-medium ${
+                  paymentStatus === "paid" ? "bg-green-100 text-green-800" :
+                  paymentStatus === "partial" ? "bg-yellow-100 text-yellow-800" :
+                  "bg-red-100 text-red-800"
+                }`}>
+                  {paymentStatus.charAt(0).toUpperCase() + paymentStatus.slice(1)}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Description */}
+          <div className="space-y-2">
+            <Label htmlFor="description">Description *</Label>
+            <Textarea
+              id="description"
+              placeholder="Describe the work performed..."
+              value={formData.description}
+              onChange={(e) => handleInputChange("description", e.target.value)}
+              className={errors.description ? "border-red-500" : ""}
+              rows={3}
+            />
+            {errors.description && (
+              <p className="text-sm text-red-500">{errors.description}</p>
+            )}
+          </div>
+
+          {/* Form Actions */}
+          <div className="flex items-center gap-4 pt-4">
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              {work ? "Update Work" : "Add Work"}
+            </Button>
+            <Button type="button" variant="outline" onClick={onCancel}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}

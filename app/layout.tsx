@@ -15,9 +15,10 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Client Transaction Manager",
-  description: "A simple client transaction and balance management webapp for small business operations in India",
+  description:
+    "A simple client transaction and balance management webapp for small business operations in India",
   icons: {
-    icon: "/convex.svg",
+    icon: "/icon.png",
   },
 };
 

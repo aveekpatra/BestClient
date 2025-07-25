@@ -1,9 +1,9 @@
-'use client'
+"use client";
 
-import { useState, useMemo } from 'react'
-import { useQuery, useMutation } from 'convex/react'
-import { api } from '../convex/_generated/api'
-import { Id } from '../convex/_generated/dataModel'
+import { useState, useMemo } from "react";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../convex/_generated/api";
+import { Id } from "../convex/_generated/dataModel";
 import {
   Table,
   TableBody,
@@ -11,20 +11,18 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from './ui/table'
+} from "./ui/table";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from './ui/select'
-import { Input } from './ui/input'
-import { Button } from './ui/button'
-import { Badge } from './ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
-import { Skeleton } from './ui/skeleton'
-import { Alert, AlertDescription } from './ui/alert'
+} from "./ui/select";
+import { Input } from "./ui/input";
+import { Button } from "./ui/button";
+import { Badge } from "./ui/badge";
+import { Skeleton } from "./ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -32,530 +30,597 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from './ui/dialog'
-import { 
-  formatCurrency, 
-  formatPhone, 
-  formatPAN, 
-  formatAadhar, 
+} from "./ui/dialog";
+import {
+  formatCurrency,
+  formatPhone,
   getWorkTypeLabel,
-  debounce 
-} from '../lib/utils'
-import { WorkType } from '../lib/types'
-import { Search, Filter, Plus, Edit, Trash2, User } from 'lucide-react'
+  debounce,
+} from "../lib/utils";
+import { WorkType } from "../lib/types";
+import {
+  Search,
+  Filter,
+  Plus,
+  Edit,
+  MoreHorizontal,
+  ChevronUp,
+  ChevronDown,
+  Users,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+} from "lucide-react";
 
 interface ClientListProps {
-  onClientSelect?: (clientId: string) => void
-  onClientEdit?: (clientId: string) => void
-  onClientCreate?: () => void
+  onClientSelect?: (clientId: string) => void;
+  onClientEdit?: (clientId: string) => void;
+  onClientCreate?: () => void;
 }
 
-type SortField = 'name' | 'balance' | 'createdAt' | 'usualWorkType'
-type SortOrder = 'asc' | 'desc'
+type SortField = "name" | "balance" | "usualWorkType" | "createdAt";
+type SortOrder = "asc" | "desc";
 
-export function ClientList({ onClientSelect, onClientEdit, onClientCreate }: ClientListProps) {
-  const [searchTerm, setSearchTerm] = useState('')
-  const [workTypeFilter, setWorkTypeFilter] = useState<WorkType | 'all'>('all')
-  const [balanceMin, setBalanceMin] = useState<string>('')
-  const [balanceMax, setBalanceMax] = useState<string>('')
-  const [balanceTypeFilter, setBalanceTypeFilter] = useState<'all' | 'positive' | 'negative' | 'zero'>('all')
-  const [sortField, setSortField] = useState<SortField>('name')
-  const [sortOrder, setSortOrder] = useState<SortOrder>('asc')
-  const [currentPage, setCurrentPage] = useState(0)
-  const [deleteClientId, setDeleteClientId] = useState<string | null>(null)
-  const [isDeleting, setIsDeleting] = useState(false)
+export function ClientList({
+  onClientSelect,
+  onClientEdit,
+  onClientCreate,
+}: ClientListProps) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [workTypeFilter, setWorkTypeFilter] = useState<WorkType | "all">("all");
+  const [balanceTypeFilter, setBalanceTypeFilter] = useState<
+    "all" | "positive" | "negative" | "zero"
+  >("all");
+  const [sortField, setSortField] = useState<SortField>("name");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
+  const [currentPage, setCurrentPage] = useState(0);
+  const [deleteClientId, setDeleteClientId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [pageSize, setPageSize] = useState(10);
 
-  const deleteClient = useMutation(api.clients.deleteClient)
-
-  const pageSize = 20
+  const deleteClient = useMutation(api.clients.deleteClient);
 
   // Debounced search to avoid too many API calls
   const debouncedSearch = useMemo(
     () => debounce((term: string) => setSearchTerm(term), 300),
-    []
-  )
+    [],
+  );
 
   const clientsData = useQuery(api.clients.getClients, {
     limit: pageSize,
     offset: currentPage * pageSize,
     sortBy: sortField,
     sortOrder,
-    workTypeFilter: workTypeFilter === 'all' ? undefined : workTypeFilter,
-    balanceTypeFilter: balanceTypeFilter === 'all' ? undefined : balanceTypeFilter,
-    balanceMin: balanceMin ? parseFloat(balanceMin) * 100 : undefined, // Convert to paise
-    balanceMax: balanceMax ? parseFloat(balanceMax) * 100 : undefined, // Convert to paise
+    workTypeFilter: workTypeFilter === "all" ? undefined : workTypeFilter,
+    balanceTypeFilter:
+      balanceTypeFilter === "all" ? undefined : balanceTypeFilter,
     searchTerm: searchTerm || undefined,
-  })
+  });
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
     } else {
-      setSortField(field)
-      setSortOrder('asc')
+      setSortField(field);
+      setSortOrder("asc");
     }
-    setCurrentPage(0) // Reset to first page when sorting changes
-  }
+    setCurrentPage(0); // Reset to first page when sorting changes
+  };
 
   const handleFilterChange = () => {
-    setCurrentPage(0) // Reset to first page when filters change
-  }
+    setCurrentPage(0); // Reset to first page when filters change
+  };
+
+  const handlePageSizeChange = (newPageSize: number) => {
+    setPageSize(newPageSize);
+    setCurrentPage(0); // Reset to first page when page size changes
+  };
 
   const clearFilters = () => {
-    setSearchTerm('')
-    setWorkTypeFilter('all')
-    setBalanceMin('')
-    setBalanceMax('')
-    setBalanceTypeFilter('all')
-    setSortField('name')
-    setSortOrder('asc')
-    setCurrentPage(0)
-  }
+    setSearchTerm("");
+    setWorkTypeFilter("all");
+    setBalanceTypeFilter("all");
+    setSortField("name");
+    setSortOrder("asc");
+    setCurrentPage(0);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteClientId) return;
+
+    setIsDeleting(true);
+    try {
+      await deleteClient({ id: deleteClientId as Id<"clients"> });
+      setDeleteClientId(null);
+    } catch (error) {
+      console.error("Failed to delete client:", error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const getSortIcon = (field: SortField) => {
-    if (sortField !== field) return '↕️'
-    return sortOrder === 'asc' ? '↑' : '↓'
-  }
+    if (sortField !== field) return null;
+    return sortOrder === "asc" ? (
+      <ChevronUp className="h-4 w-4 inline ml-1" />
+    ) : (
+      <ChevronDown className="h-4 w-4 inline ml-1" />
+    );
+  };
 
   const getBalanceColor = (balance: number) => {
-    if (balance > 0) return 'text-green-600' // Client owes business
-    if (balance < 0) return 'text-red-600'   // Business owes client
-    return 'text-gray-600'                   // Zero balance
-  }
+    if (balance > 0) return "text-green-600";
+    if (balance < 0) return "text-red-600";
+    return "text-gray-600";
+  };
 
-  const getBalanceLabel = (balance: number) => {
-    if (balance > 0) return 'Owes'
-    if (balance < 0) return 'Owed'
-    return 'Clear'
-  }
+  const total = clientsData?.total ?? 0;
 
   if (clientsData === undefined) {
-    return <ClientListSkeleton />
-  }
-
-  if (clientsData === null) {
     return (
-      <Alert>
-        <AlertDescription>
-          Failed to load clients. Please try again.
-        </AlertDescription>
-      </Alert>
-    )
-  }
+      <div className="space-y-6">
+        {/* Header Skeleton */}
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-10 w-32" />
+        </div>
 
-  const { total, hasMore } = clientsData || { clients: [], total: 0, hasMore: false }
+        {/* Table Skeleton */}
+        <div className="space-y-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-16 w-full" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <User className="h-6 w-6" />
-          <h2 className="text-2xl font-semibold">Clients</h2>
-          <Badge variant="secondary">{total}</Badge>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-10 h-10 bg-gray-100 rounded-lg">
+            <Users className="h-5 w-5 text-gray-600" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900">Clients</h1>
+            <p className="text-sm text-gray-500">{total} total clients</p>
+          </div>
         </div>
-        <Button onClick={onClientCreate} className="flex items-center space-x-2">
+        <Button
+          onClick={onClientCreate}
+          className="flex items-center gap-2 bg-gray-900 hover:bg-gray-800"
+        >
           <Plus className="h-4 w-4" />
-          <span>Add Client</span>
+          Add Client
         </Button>
       </div>
 
       {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Filter className="h-4 w-4" />
-            <span>Filters</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Mobile-first responsive grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-            {/* Search - Full width on mobile */}
-            <div className="relative sm:col-span-2 lg:col-span-1">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search clients..."
-                className="pl-10"
-                onChange={(e) => debouncedSearch(e.target.value)}
-              />
-            </div>
+      <div className="flex items-center justify-between gap-4">
+        {/* Search */}
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Filter by name or email..."
+            className="pl-10 border-gray-200 focus:border-gray-300 focus:ring-gray-200"
+            onChange={(e) => debouncedSearch(e.target.value)}
+          />
+        </div>
 
-            {/* Work Type Filter */}
-            <Select
-              value={workTypeFilter}
-              onValueChange={(value: WorkType | 'all') => {
-                setWorkTypeFilter(value)
-                handleFilterChange()
-              }}
+        <div className="flex items-center gap-3">
+          {/* Filter Dropdown */}
+          <Select
+            value={`${workTypeFilter}-${balanceTypeFilter}`}
+            onValueChange={(value) => {
+              const [workType, balanceType] = value.split("-") as [
+                WorkType | "all",
+                "all" | "positive" | "negative" | "zero",
+              ];
+              setWorkTypeFilter(workType);
+              setBalanceTypeFilter(balanceType);
+              handleFilterChange();
+            }}
+          >
+            <SelectTrigger className="w-40 border-gray-200">
+              <Filter className="h-4 w-4 mr-2 text-gray-500" />
+              <SelectValue placeholder="Filter" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all-all">All Clients</SelectItem>
+
+              {/* Status Filters */}
+              <div className="px-2 py-1.5 text-xs font-medium text-gray-500 border-b">
+                Status
+              </div>
+              <SelectItem value="all-positive">Active Clients</SelectItem>
+              <SelectItem value="all-negative">Inactive Clients</SelectItem>
+              <SelectItem value="all-zero">Balanced Clients</SelectItem>
+
+              {/* Work Type Filters */}
+              <div className="px-2 py-1.5 text-xs font-medium text-gray-500 border-b border-t mt-1">
+                Work Type
+              </div>
+              <SelectItem value="online-work-all">Online Work</SelectItem>
+              <SelectItem value="health-insurance-all">
+                Health Insurance
+              </SelectItem>
+              <SelectItem value="life-insurance-all">Life Insurance</SelectItem>
+              <SelectItem value="income-tax-all">Income Tax</SelectItem>
+              <SelectItem value="mutual-funds-all">Mutual Funds</SelectItem>
+              <SelectItem value="others-all">Others</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Sort Dropdown */}
+          <Select
+            value={`${sortField}-${sortOrder}`}
+            onValueChange={(value) => {
+              const [field, order] = value.split("-") as [SortField, SortOrder];
+              setSortField(field);
+              setSortOrder(order);
+              setCurrentPage(0);
+            }}
+          >
+            <SelectTrigger className="w-40 border-gray-200">
+              <ChevronUp className="h-4 w-4 mr-2 text-gray-500" />
+              <SelectValue placeholder="Sort" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="name-asc">Name A-Z</SelectItem>
+              <SelectItem value="name-desc">Name Z-A</SelectItem>
+              <SelectItem value="balance-desc">Balance High-Low</SelectItem>
+              <SelectItem value="balance-asc">Balance Low-High</SelectItem>
+              <SelectItem value="usualWorkType-asc">Work Type A-Z</SelectItem>
+              <SelectItem value="createdAt-desc">Newest First</SelectItem>
+              <SelectItem value="createdAt-asc">Oldest First</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Clear Filters - only show if filters are active */}
+          {(workTypeFilter !== "all" ||
+            balanceTypeFilter !== "all" ||
+            searchTerm ||
+            sortField !== "name" ||
+            sortOrder !== "asc") && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearFilters}
+              className="text-gray-500 hover:text-gray-700"
             >
-              <SelectTrigger>
-                <SelectValue placeholder="Work Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Work Types</SelectItem>
-                <SelectItem value="online-work">Online Work</SelectItem>
-                <SelectItem value="health-insurance">Health Insurance</SelectItem>
-                <SelectItem value="life-insurance">Life Insurance</SelectItem>
-                <SelectItem value="income-tax">Income Tax</SelectItem>
-                <SelectItem value="mutual-funds">Mutual Funds</SelectItem>
-                <SelectItem value="others">Others</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Balance Type Filter */}
-            <Select
-              value={balanceTypeFilter}
-              onValueChange={(value: 'all' | 'positive' | 'negative' | 'zero') => {
-                setBalanceTypeFilter(value)
-                handleFilterChange()
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Balance Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Balances</SelectItem>
-                <SelectItem value="positive">Client Owes (₹+)</SelectItem>
-                <SelectItem value="negative">You Owe (₹-)</SelectItem>
-                <SelectItem value="zero">Balanced (₹0)</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Balance Range - Stack on mobile */}
-            <div className="sm:col-span-2 lg:col-span-2 xl:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input
-                type="number"
-                placeholder="Min Balance (₹)"
-                value={balanceMin}
-                onChange={(e) => {
-                  setBalanceMin(e.target.value)
-                  handleFilterChange()
-                }}
-              />
-              <Input
-                type="number"
-                placeholder="Max Balance (₹)"
-                value={balanceMax}
-                onChange={(e) => {
-                  setBalanceMax(e.target.value)
-                  handleFilterChange()
-                }}
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end">
-            <Button variant="outline" onClick={clearFilters}>
-              Clear Filters
+              Clear
             </Button>
-          </div>
-        </CardContent>
-      </Card>
+          )}
+        </div>
+      </div>
 
       {/* Results */}
-      <Card>
-        <CardContent className="p-0">
-          {!clientsData?.clients || clientsData.clients.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
-              <User className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-              <p className="text-lg font-medium">No clients found</p>
-              <p className="text-sm">Try adjusting your filters or add a new client</p>
-            </div>
-          ) : (
-            <>
-              {/* Desktop Table View */}
-              <div className="hidden md:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead 
-                        className="cursor-pointer hover:bg-gray-50"
-                        onClick={() => handleSort('name')}
-                      >
-                        Name {getSortIcon('name')}
-                      </TableHead>
-                      <TableHead>Contact</TableHead>
-                      <TableHead 
-                        className="cursor-pointer hover:bg-gray-50"
-                        onClick={() => handleSort('usualWorkType')}
-                      >
-                        Work Type {getSortIcon('usualWorkType')}
-                      </TableHead>
-                      <TableHead 
-                        className="cursor-pointer hover:bg-gray-50"
-                        onClick={() => handleSort('balance')}
-                      >
-                        Balance {getSortIcon('balance')}
-                      </TableHead>
-                      <TableHead>Documents</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {clientsData?.clients?.map((client) => (
-                      <TableRow 
-                        key={client._id}
-                        className="cursor-pointer hover:bg-gray-50"
-                        onClick={() => onClientSelect?.(client._id)}
-                      >
-                        <TableCell>
-                          <div>
-                            <div className="font-medium">{client.name}</div>
-                            <div className="text-sm text-gray-500">{client.address}</div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            <div className="text-sm">{formatPhone(client.phone)}</div>
-                            {client.email && (
-                              <div className="text-sm text-gray-500">{client.email}</div>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">
-                            {getWorkTypeLabel(client.usualWorkType)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className={`font-medium ${getBalanceColor(client.balance)}`}>
-                            {formatCurrency(Math.abs(client.balance))}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {getBalanceLabel(client.balance)}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            {client.panNumber && (
-                              <div className="text-xs">PAN: {formatPAN(client.panNumber)}</div>
-                            )}
-                            {client.aadharNumber && (
-                              <div className="text-xs">Aadhar: {formatAadhar(client.aadharNumber)}</div>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex space-x-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                onClientEdit?.(client._id)
-                              }}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setDeleteClientId(client._id)
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-
-              {/* Mobile Card View */}
-              <div className="md:hidden space-y-4 p-4">
+      {!clientsData?.clients || clientsData.clients.length === 0 ? (
+        <div className="bg-white border border-gray-200 rounded-lg p-12 text-center">
+          <div className="flex items-center justify-center w-16 h-16 bg-gray-100 rounded-lg mx-auto mb-4">
+            <Users className="h-8 w-8 text-gray-400" />
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            No clients found
+          </h3>
+          <p className="text-gray-500 mb-4">
+            Try adjusting your filters or add a new client
+          </p>
+          <Button
+            onClick={onClientCreate}
+            className="bg-gray-900 hover:bg-gray-800"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add your first client
+          </Button>
+        </div>
+      ) : (
+        <>
+          {/* Desktop Table */}
+          <div className="hidden md:block bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-gray-200 bg-gray-50/50">
+                  <TableHead
+                    className="cursor-pointer hover:bg-gray-100 transition-colors font-medium"
+                    onClick={() => handleSort("name")}
+                  >
+                    Name {getSortIcon("name")}
+                  </TableHead>
+                  <TableHead className="font-medium">Email</TableHead>
+                  <TableHead className="font-medium">Location</TableHead>
+                  <TableHead
+                    className="cursor-pointer hover:bg-gray-100 transition-colors font-medium"
+                    onClick={() => handleSort("usualWorkType")}
+                  >
+                    Status {getSortIcon("usualWorkType")}
+                  </TableHead>
+                  <TableHead className="font-medium">Work Type</TableHead>
+                  <TableHead
+                    className="cursor-pointer hover:bg-gray-100 transition-colors font-medium text-right"
+                    onClick={() => handleSort("balance")}
+                  >
+                    Balance {getSortIcon("balance")}
+                  </TableHead>
+                  <TableHead className="font-medium w-12"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {clientsData?.clients?.map((client) => (
-                  <Card 
+                  <TableRow
                     key={client._id}
-                    className="cursor-pointer hover:shadow-md transition-shadow"
+                    className="cursor-pointer hover:bg-gray-50 transition-colors border-gray-200"
                     onClick={() => onClientSelect?.(client._id)}
                   >
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <h3 className="font-medium text-lg">{client.name}</h3>
-                          <p className="text-sm text-gray-500 mt-1">{client.address}</p>
-                        </div>
-                        <div className="flex space-x-1 ml-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              onClientEdit?.(client._id)
-                            }}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setDeleteClientId(client._id)
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <p className="text-gray-500">Phone</p>
-                          <p className="font-medium">{formatPhone(client.phone)}</p>
-                          {client.email && (
-                            <>
-                              <p className="text-gray-500 mt-2">Email</p>
-                              <p className="font-medium">{client.email}</p>
-                            </>
-                          )}
+                    <TableCell className="py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center justify-center w-10 h-10 bg-gray-100 rounded-lg text-sm font-medium text-gray-600">
+                          {client.name.charAt(0).toUpperCase()}
                         </div>
                         <div>
-                          <p className="text-gray-500">Work Type</p>
-                          <Badge variant="outline" className="mt-1">
-                            {getWorkTypeLabel(client.usualWorkType)}
-                          </Badge>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center justify-between mt-4 pt-3 border-t">
-                        <div>
-                          <p className="text-gray-500 text-sm">Balance</p>
-                          <div className={`font-medium ${getBalanceColor(client.balance)}`}>
-                            {formatCurrency(Math.abs(client.balance))} 
-                            <span className="text-xs ml-1">({getBalanceLabel(client.balance)})</span>
+                          <div className="font-medium text-gray-900">
+                            {client.name}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {formatPhone(client.phone)}
                           </div>
                         </div>
-                        {(client.panNumber || client.aadharNumber) && (
-                          <div className="text-right text-xs text-gray-500">
-                            {client.panNumber && <div>PAN: {formatPAN(client.panNumber)}</div>}
-                            {client.aadharNumber && <div>Aadhar: {formatAadhar(client.aadharNumber)}</div>}
-                          </div>
-                        )}
                       </div>
-                    </CardContent>
-                  </Card>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <div className="text-sm text-gray-900">
+                        {client.email || "No email"}
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <div className="text-sm text-gray-900">
+                        {client.address}
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <Badge
+                        variant={client.balance >= 0 ? "default" : "secondary"}
+                        className={
+                          client.balance >= 0
+                            ? "bg-gray-900 text-white"
+                            : "bg-gray-100 text-gray-600"
+                        }
+                      >
+                        {client.balance >= 0 ? "Active" : "Inactive"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <div className="text-sm text-gray-900">
+                        {getWorkTypeLabel(client.usualWorkType)}
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-4 text-right">
+                      <div
+                        className={`font-medium ${getBalanceColor(client.balance)}`}
+                      >
+                        {formatCurrency(Math.abs(client.balance))}
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onClientEdit?.(client._id);
+                          }}
+                          className="h-8 w-8 p-0 hover:bg-gray-100"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteClientId(client._id);
+                          }}
+                          className="h-8 w-8 p-0 hover:bg-gray-100"
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
                 ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Mobile Cards */}
+          <div className="md:hidden space-y-3">
+            {clientsData?.clients?.map((client) => (
+              <div
+                key={client._id}
+                className="bg-white border border-gray-200 rounded-lg p-4 cursor-pointer hover:shadow-sm transition-shadow"
+                onClick={() => onClientSelect?.(client._id)}
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-10 h-10 bg-gray-100 rounded-lg text-sm font-medium text-gray-600">
+                      {client.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-gray-900">
+                        {client.name}
+                      </h3>
+                      <p className="text-sm text-gray-500">
+                        {formatPhone(client.phone)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onClientEdit?.(client._id);
+                      }}
+                      className="h-8 w-8 p-0"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleteClientId(client._id);
+                      }}
+                      className="h-8 w-8 p-0"
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-500">Email</span>
+                    <span className="text-sm text-gray-900">
+                      {client.email || "No email"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-500">Status</span>
+                    <Badge
+                      variant={client.balance >= 0 ? "default" : "secondary"}
+                      className={
+                        client.balance >= 0
+                          ? "bg-gray-900 text-white"
+                          : "bg-gray-100 text-gray-600"
+                      }
+                    >
+                      {client.balance >= 0 ? "Active" : "Inactive"}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-500">Balance</span>
+                    <span
+                      className={`text-sm font-medium ${getBalanceColor(client.balance)}`}
+                    >
+                      {formatCurrency(Math.abs(client.balance))}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Pagination */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">Rows per page</span>
+                <Select
+                  value={pageSize.toString()}
+                  onValueChange={(value) =>
+                    handlePageSizeChange(parseInt(value))
+                  }
+                >
+                  <SelectTrigger className="w-16 h-8 border-gray-200">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5">5</SelectItem>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
-              {/* Pagination */}
-              <div className="flex flex-col sm:flex-row items-center justify-between p-4 border-t gap-4">
-                <div className="text-sm text-gray-500 text-center sm:text-left">
-                  Showing {currentPage * pageSize + 1} to {Math.min((currentPage + 1) * pageSize, total)} of {total} clients
-                </div>
-                <div className="flex space-x-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={currentPage === 0}
-                    onClick={() => setCurrentPage(currentPage - 1)}
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={!hasMore}
-                    onClick={() => setCurrentPage(currentPage + 1)}
-                  >
-                    Next
-                  </Button>
-                </div>
+              <div className="text-sm text-gray-500">
+                <span className="font-medium">
+                  {currentPage * pageSize + 1}-
+                  {Math.min((currentPage + 1) * pageSize, total)}
+                </span>{" "}
+                of <span className="font-medium">{total}</span>
               </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(0)}
+                disabled={currentPage === 0}
+                className="h-8 w-8 p-0 border-gray-200"
+              >
+                <ChevronsLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(Math.max(0, currentPage - 1))}
+                disabled={currentPage === 0}
+                className="h-8 w-8 p-0 border-gray-200"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(currentPage + 1)}
+                disabled={!clientsData?.hasMore}
+                className="h-8 w-8 p-0 border-gray-200"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const totalPages = Math.ceil(total / pageSize);
+                  setCurrentPage(totalPages - 1);
+                }}
+                disabled={!clientsData?.hasMore}
+                className="h-8 w-8 p-0 border-gray-200"
+              >
+                <ChevronsRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteClientId !== null} onOpenChange={() => setDeleteClientId(null)}>
+      <Dialog
+        open={!!deleteClientId}
+        onOpenChange={() => setDeleteClientId(null)}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Client</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this client? This action cannot be undone.
-              All associated work records must be deleted first.
+              Are you sure you want to delete this client? This action cannot be
+              undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button 
-              variant="outline" 
-              disabled={isDeleting}
-              onClick={() => setDeleteClientId(null)}
-            >
+            <Button variant="outline" onClick={() => setDeleteClientId(null)}>
               Cancel
             </Button>
-            <Button 
-              variant="destructive" 
+            <Button
+              variant="destructive"
+              onClick={handleDeleteConfirm}
               disabled={isDeleting}
-              onClick={async () => {
-                if (!deleteClientId) return
-                
-                setIsDeleting(true)
-                try {
-                  await deleteClient({ id: deleteClientId as Id<"clients"> })
-                  setDeleteClientId(null)
-                } catch (error) {
-                  console.error('Failed to delete client:', error)
-                  // TODO: Show error toast
-                } finally {
-                  setIsDeleting(false)
-                }
-              }}
             >
-              {isDeleting ? 'Deleting...' : 'Delete'}
+              {isDeleting ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
-  )
-}
-
-function ClientListSkeleton() {
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <Skeleton className="h-8 w-32" />
-        <Skeleton className="h-10 w-32" />
-      </div>
-      
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-6 w-24" />
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="p-0">
-          <div className="space-y-4 p-4">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex items-center space-x-4">
-                <Skeleton className="h-12 w-12 rounded-full" />
-                <div className="space-y-2 flex-1">
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-3 w-48" />
-                </div>
-                <Skeleton className="h-6 w-20" />
-                <Skeleton className="h-4 w-16" />
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  )
+  );
 }

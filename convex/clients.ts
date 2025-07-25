@@ -3,6 +3,11 @@ import { mutation, query } from "./_generated/server";
 import { validateClientData } from "../lib/validation";
 import { Doc } from "./_generated/dataModel";
 
+// Helper function to get work types
+function getClientWorkTypes(client: any): string[] {
+  return client.usualWorkTypes || ["online-work"]; // Default fallback
+}
+
 // Create a new client
 export const createClient = mutation({
   args: {
@@ -13,15 +18,20 @@ export const createClient = mutation({
     email: v.optional(v.string()),
     panNumber: v.optional(v.string()),
     aadharNumber: v.optional(v.string()),
-    usualWorkType: v.union(
-      v.literal("online-work"),
-      v.literal("health-insurance"),
-      v.literal("life-insurance"),
-      v.literal("income-tax"),
-      v.literal("mutual-funds"),
-      v.literal("others")
+    usualWorkTypes: v.array(
+      v.union(
+        v.literal("online-work"),
+        v.literal("health-insurance"),
+        v.literal("life-insurance"),
+        v.literal("income-tax"),
+        v.literal("p-tax"),
+        v.literal("mutual-funds"),
+        v.literal("others"),
+      ),
     ),
     balance: v.number(),
+    password: v.optional(v.string()),
+    ptId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     // Validate client data
@@ -36,7 +46,9 @@ export const createClient = mutation({
     });
 
     if (!validation.isValid) {
-      throw new Error(`Validation failed: ${JSON.stringify(validation.errors)}`);
+      throw new Error(
+        `Validation failed: ${JSON.stringify(validation.errors)}`,
+      );
     }
 
     // Check for duplicate phone number
@@ -74,7 +86,7 @@ export const createClient = mutation({
     }
 
     const now = Date.now();
-    
+
     return await ctx.db.insert("clients", {
       name: args.name.trim(),
       dateOfBirth: args.dateOfBirth,
@@ -83,8 +95,10 @@ export const createClient = mutation({
       email: args.email?.trim(),
       panNumber: args.panNumber?.toUpperCase(),
       aadharNumber: args.aadharNumber,
-      usualWorkType: args.usualWorkType,
+      usualWorkTypes: args.usualWorkTypes,
       balance: args.balance,
+      password: args.password?.trim(),
+      ptId: args.ptId?.trim(),
       createdAt: now,
       updatedAt: now,
     });
@@ -102,15 +116,20 @@ export const updateClient = mutation({
     email: v.optional(v.string()),
     panNumber: v.optional(v.string()),
     aadharNumber: v.optional(v.string()),
-    usualWorkType: v.union(
-      v.literal("online-work"),
-      v.literal("health-insurance"),
-      v.literal("life-insurance"),
-      v.literal("income-tax"),
-      v.literal("mutual-funds"),
-      v.literal("others")
+    usualWorkTypes: v.array(
+      v.union(
+        v.literal("online-work"),
+        v.literal("health-insurance"),
+        v.literal("life-insurance"),
+        v.literal("income-tax"),
+        v.literal("p-tax"),
+        v.literal("mutual-funds"),
+        v.literal("others"),
+      ),
     ),
     balance: v.number(),
+    password: v.optional(v.string()),
+    ptId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     // Validate client data
@@ -125,7 +144,9 @@ export const updateClient = mutation({
     });
 
     if (!validation.isValid) {
-      throw new Error(`Validation failed: ${JSON.stringify(validation.errors)}`);
+      throw new Error(
+        `Validation failed: ${JSON.stringify(validation.errors)}`,
+      );
     }
 
     // Check if client exists
@@ -137,11 +158,11 @@ export const updateClient = mutation({
     // Check for duplicate phone number (excluding current client)
     const duplicatePhone = await ctx.db
       .query("clients")
-      .filter((q) => 
+      .filter((q) =>
         q.and(
           q.eq(q.field("phone"), args.phone),
-          q.neq(q.field("_id"), args.id)
-        )
+          q.neq(q.field("_id"), args.id),
+        ),
       )
       .first();
 
@@ -153,11 +174,11 @@ export const updateClient = mutation({
     if (args.panNumber) {
       const duplicatePAN = await ctx.db
         .query("clients")
-        .filter((q) => 
+        .filter((q) =>
           q.and(
             q.eq(q.field("panNumber"), args.panNumber),
-            q.neq(q.field("_id"), args.id)
-          )
+            q.neq(q.field("_id"), args.id),
+          ),
         )
         .first();
 
@@ -170,11 +191,11 @@ export const updateClient = mutation({
     if (args.aadharNumber) {
       const duplicateAadhar = await ctx.db
         .query("clients")
-        .filter((q) => 
+        .filter((q) =>
           q.and(
             q.eq(q.field("aadharNumber"), args.aadharNumber),
-            q.neq(q.field("_id"), args.id)
-          )
+            q.neq(q.field("_id"), args.id),
+          ),
         )
         .first();
 
@@ -191,8 +212,10 @@ export const updateClient = mutation({
       email: args.email?.trim(),
       panNumber: args.panNumber?.toUpperCase(),
       aadharNumber: args.aadharNumber,
-      usualWorkType: args.usualWorkType,
+      usualWorkTypes: args.usualWorkTypes,
       balance: args.balance,
+      password: args.password?.trim(),
+      ptId: args.ptId?.trim(),
       updatedAt: Date.now(),
     });
   },
@@ -215,7 +238,9 @@ export const deleteClient = mutation({
       .first();
 
     if (associatedWorks) {
-      throw new Error("Cannot delete client with associated work records. Please delete all work records first.");
+      throw new Error(
+        "Cannot delete client with associated work records. Please delete all work records first.",
+      );
     }
 
     return await ctx.db.delete(args.id);
@@ -227,26 +252,29 @@ export const getClients = query({
   args: {
     limit: v.optional(v.number()),
     offset: v.optional(v.number()),
-    sortBy: v.optional(v.union(
-      v.literal("name"),
-      v.literal("balance"),
-      v.literal("createdAt"),
-      v.literal("usualWorkType")
-    )),
+    sortBy: v.optional(
+      v.union(
+        v.literal("name"),
+        v.literal("balance"),
+        v.literal("createdAt"),
+        v.literal("usualWorkTypes"),
+      ),
+    ),
     sortOrder: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
-    workTypeFilter: v.optional(v.union(
-      v.literal("online-work"),
-      v.literal("health-insurance"),
-      v.literal("life-insurance"),
-      v.literal("income-tax"),
-      v.literal("mutual-funds"),
-      v.literal("others")
-    )),
-    balanceTypeFilter: v.optional(v.union(
-      v.literal("positive"),
-      v.literal("negative"),
-      v.literal("zero")
-    )),
+    workTypeFilter: v.optional(
+      v.union(
+        v.literal("online-work"),
+        v.literal("health-insurance"),
+        v.literal("life-insurance"),
+        v.literal("income-tax"),
+        v.literal("p-tax"),
+        v.literal("mutual-funds"),
+        v.literal("others"),
+      ),
+    ),
+    balanceTypeFilter: v.optional(
+      v.union(v.literal("positive"), v.literal("negative"), v.literal("zero")),
+    ),
     balanceMin: v.optional(v.number()),
     balanceMax: v.optional(v.number()),
     searchTerm: v.optional(v.string()),
@@ -254,32 +282,31 @@ export const getClients = query({
   handler: async (ctx, args) => {
     let results: Doc<"clients">[];
 
+    // Get all clients first
+    results = await ctx.db.query("clients").collect();
+
     // Apply work type filter
     if (args.workTypeFilter) {
-      results = await ctx.db
-        .query("clients")
-        .withIndex("by_work_type", (q) => 
-          q.eq("usualWorkType", args.workTypeFilter!)
-        )
-        .collect();
-    } else {
-      results = await ctx.db.query("clients").collect();
+      results = results.filter((client) =>
+        getClientWorkTypes(client).includes(args.workTypeFilter!),
+      );
     }
 
     // Apply search filter
     if (args.searchTerm) {
       const searchLower = args.searchTerm.toLowerCase();
-      results = results.filter(client => 
-        client.name.toLowerCase().includes(searchLower) ||
-        client.address.toLowerCase().includes(searchLower) ||
-        client.phone.includes(args.searchTerm!) ||
-        (client.email && client.email.toLowerCase().includes(searchLower))
+      results = results.filter(
+        (client) =>
+          client.name.toLowerCase().includes(searchLower) ||
+          client.address.toLowerCase().includes(searchLower) ||
+          client.phone.includes(args.searchTerm!) ||
+          (client.email && client.email.toLowerCase().includes(searchLower)),
       );
     }
 
     // Apply balance type filter
     if (args.balanceTypeFilter) {
-      results = results.filter(client => {
+      results = results.filter((client) => {
         switch (args.balanceTypeFilter) {
           case "positive":
             return client.balance > 0;
@@ -295,17 +322,17 @@ export const getClients = query({
 
     // Apply balance range filter
     if (args.balanceMin !== undefined) {
-      results = results.filter(client => client.balance >= args.balanceMin!);
+      results = results.filter((client) => client.balance >= args.balanceMin!);
     }
     if (args.balanceMax !== undefined) {
-      results = results.filter(client => client.balance <= args.balanceMax!);
+      results = results.filter((client) => client.balance <= args.balanceMax!);
     }
 
     // Apply sorting
     if (args.sortBy) {
       results.sort((a, b) => {
         let aVal: any, bVal: any;
-        
+
         switch (args.sortBy) {
           case "name":
             aVal = a.name.toLowerCase();
@@ -319,9 +346,9 @@ export const getClients = query({
             aVal = a.createdAt;
             bVal = b.createdAt;
             break;
-          case "usualWorkType":
-            aVal = a.usualWorkType;
-            bVal = b.usualWorkType;
+          case "usualWorkTypes":
+            aVal = getClientWorkTypes(a).join(", ");
+            bVal = getClientWorkTypes(b).join(", ");
             break;
           default:
             aVal = a.name.toLowerCase();
@@ -363,15 +390,16 @@ export const getClientsByWorkType = query({
       v.literal("health-insurance"),
       v.literal("life-insurance"),
       v.literal("income-tax"),
+      v.literal("p-tax"),
       v.literal("mutual-funds"),
-      v.literal("others")
+      v.literal("others"),
     ),
   },
   handler: async (ctx, args) => {
-    return await ctx.db
-      .query("clients")
-      .withIndex("by_work_type", (q) => q.eq("usualWorkType", args.workType))
-      .collect();
+    const allClients = await ctx.db.query("clients").collect();
+    return allClients.filter((client) =>
+      getClientWorkTypes(client).includes(args.workType),
+    );
   },
 });
 
@@ -385,10 +413,10 @@ export const getClientsWithBalance = query({
     let results = await ctx.db.query("clients").collect();
 
     if (args.minBalance !== undefined) {
-      results = results.filter(client => client.balance >= args.minBalance!);
+      results = results.filter((client) => client.balance >= args.minBalance!);
     }
     if (args.maxBalance !== undefined) {
-      results = results.filter(client => client.balance <= args.maxBalance!);
+      results = results.filter((client) => client.balance <= args.maxBalance!);
     }
 
     return results;
@@ -408,7 +436,7 @@ export const updateClientBalance = mutation({
     }
 
     const newBalance = client.balance + args.balanceChange;
-    
+
     return await ctx.db.patch(args.clientId, {
       balance: newBalance,
       updatedAt: Date.now(),
@@ -457,11 +485,12 @@ export const searchClients = query({
   handler: async (ctx, args) => {
     const clients = await ctx.db.query("clients").collect();
     const searchLower = args.searchTerm.toLowerCase();
-    
-    return clients.filter(client => 
-      client.name.toLowerCase().includes(searchLower) ||
-      client.phone.includes(args.searchTerm) ||
-      (client.email && client.email.toLowerCase().includes(searchLower))
+
+    return clients.filter(
+      (client) =>
+        client.name.toLowerCase().includes(searchLower) ||
+        client.phone.includes(args.searchTerm) ||
+        (client.email && client.email.toLowerCase().includes(searchLower)),
     );
   },
 });
@@ -472,13 +501,13 @@ export const getClientsByBalanceType = query({
     balanceType: v.union(
       v.literal("positive"), // Client owes business
       v.literal("negative"), // Business owes client
-      v.literal("zero")      // Balanced
+      v.literal("zero"), // Balanced
     ),
   },
   handler: async (ctx, args) => {
     const clients = await ctx.db.query("clients").collect();
-    
-    return clients.filter(client => {
+
+    return clients.filter((client) => {
       switch (args.balanceType) {
         case "positive":
           return client.balance > 0;

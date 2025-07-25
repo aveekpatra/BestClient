@@ -1,11 +1,12 @@
 import { Id } from "../convex/_generated/dataModel";
 
 // Work Type enum
-export type WorkType = 
+export type WorkType =
   | "online-work"
-  | "health-insurance" 
+  | "health-insurance"
   | "life-insurance"
   | "income-tax"
+  | "p-tax"
   | "mutual-funds"
   | "others";
 
@@ -22,8 +23,10 @@ export interface Client {
   email?: string;
   panNumber?: string;
   aadharNumber?: string;
-  usualWorkType: WorkType;
+  usualWorkTypes: WorkType[];
   balance: number; // In paise
+  password?: string; // For income tax related work
+  ptId?: string; // For P-tax related work
   createdAt: number;
   updatedAt: number;
 }
@@ -35,7 +38,7 @@ export interface Work {
   transactionDate: string; // DD/MM/YYYY
   totalPrice: number; // In paise
   paidAmount: number; // In paise
-  workType: WorkType;
+  workTypes: WorkType[];
   description: string;
   paymentStatus: PaymentStatus;
   createdAt: number;
@@ -43,7 +46,7 @@ export interface Work {
 }
 
 // Sort options for filtering
-export type SortOption = 
+export type SortOption =
   | "name"
   | "balance"
   | "income"
@@ -58,15 +61,16 @@ export const WORK_TYPE_LABELS: Record<WorkType, string> = {
   "health-insurance": "Health Insurance",
   "life-insurance": "Life Insurance",
   "income-tax": "Income Tax",
+  "p-tax": "P-Tax",
   "mutual-funds": "Mutual Funds",
-  "others": "Others"
+  others: "Others",
 };
 
 // Payment status display labels
 export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
-  "paid": "Paid",
-  "partial": "Partial",
-  "unpaid": "Unpaid"
+  paid: "Paid",
+  partial: "Partial",
+  unpaid: "Unpaid",
 };
 
 // Form data types for creating/updating
@@ -78,8 +82,10 @@ export interface ClientFormData {
   email?: string;
   panNumber?: string;
   aadharNumber?: string;
-  usualWorkType: WorkType;
+  usualWorkTypes: WorkType[];
   balance: number;
+  password?: string; // For income tax related work
+  ptId?: string; // For P-tax related work
 }
 
 export interface WorkFormData {
@@ -87,7 +93,7 @@ export interface WorkFormData {
   transactionDate: string;
   totalPrice: number;
   paidAmount: number;
-  workType: WorkType;
+  workTypes: WorkType[];
   description: string;
 }
 

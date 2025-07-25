@@ -59,7 +59,7 @@ interface ClientListProps {
   onClientCreate?: () => void;
 }
 
-type SortField = "name" | "balance" | "usualWorkType" | "createdAt";
+type SortField = "name" | "balance" | "usualWorkTypes" | "createdAt";
 type SortOrder = "asc" | "desc";
 
 export function ClientList({
@@ -67,6 +67,7 @@ export function ClientList({
   onClientEdit,
   onClientCreate,
 }: ClientListProps) {
+  const [searchInput, setSearchInput] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [workTypeFilter, setWorkTypeFilter] = useState<WorkType | "all">("all");
   const [balanceTypeFilter, setBalanceTypeFilter] = useState<
@@ -83,7 +84,11 @@ export function ClientList({
 
   // Debounced search to avoid too many API calls
   const debouncedSearch = useMemo(
-    () => debounce((term: string) => setSearchTerm(term), 300),
+    () =>
+      debounce((term: string) => {
+        setSearchTerm(term);
+        setCurrentPage(0); // Reset to first page when search term changes
+      }, 300),
     [],
   );
 
@@ -118,6 +123,7 @@ export function ClientList({
   };
 
   const clearFilters = () => {
+    setSearchInput("");
     setSearchTerm("");
     setWorkTypeFilter("all");
     setBalanceTypeFilter("all");
@@ -150,8 +156,10 @@ export function ClientList({
   };
 
   const getBalanceColor = (balance: number) => {
-    if (balance > 0) return "text-green-600";
-    if (balance < 0) return "text-red-600";
+    // Display: Positive DB values (client owes) as negative red values
+    // Display: Negative DB values (overpaid) as positive green values
+    if (balance > 0) return "text-red-600"; // Client owes = debt = red
+    if (balance < 0) return "text-green-600"; // Overpaid = credit = green
     return "text-gray-600";
   };
 
@@ -204,9 +212,13 @@ export function ClientList({
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
-            placeholder="Filter by name or email..."
+            placeholder="Search by name, email, phone, or address..."
             className="pl-10 border-gray-200 focus:border-gray-300 focus:ring-gray-200"
-            onChange={(e) => debouncedSearch(e.target.value)}
+            value={searchInput}
+            onChange={(e) => {
+              setSearchInput(e.target.value);
+              debouncedSearch(e.target.value);
+            }}
           />
         </div>
 
@@ -273,7 +285,7 @@ export function ClientList({
               <SelectItem value="name-desc">Name Z-A</SelectItem>
               <SelectItem value="balance-desc">Balance High-Low</SelectItem>
               <SelectItem value="balance-asc">Balance Low-High</SelectItem>
-              <SelectItem value="usualWorkType-asc">Work Type A-Z</SelectItem>
+              <SelectItem value="usualWorkTypes-asc">Work Type A-Z</SelectItem>
               <SelectItem value="createdAt-desc">Newest First</SelectItem>
               <SelectItem value="createdAt-asc">Oldest First</SelectItem>
             </SelectContent>
@@ -282,7 +294,7 @@ export function ClientList({
           {/* Clear Filters - only show if filters are active */}
           {(workTypeFilter !== "all" ||
             balanceTypeFilter !== "all" ||
-            searchTerm ||
+            searchInput ||
             sortField !== "name" ||
             sortOrder !== "asc") && (
             <Button
@@ -334,9 +346,9 @@ export function ClientList({
                   <TableHead className="font-medium">Location</TableHead>
                   <TableHead
                     className="cursor-pointer hover:bg-gray-100 transition-colors font-medium"
-                    onClick={() => handleSort("usualWorkType")}
+                    onClick={() => handleSort("usualWorkTypes")}
                   >
-                    Status {getSortIcon("usualWorkType")}
+                    Status {getSortIcon("usualWorkTypes")}
                   </TableHead>
                   <TableHead className="font-medium">Work Type</TableHead>
                   <TableHead
@@ -393,15 +405,25 @@ export function ClientList({
                       </Badge>
                     </TableCell>
                     <TableCell className="py-4">
-                      <div className="text-sm text-gray-900">
-                        {getWorkTypeLabel(client.usualWorkType)}
+                      <div className="flex flex-wrap gap-1">
+                        {(client.usualWorkTypes || ["online-work"]).map(
+                          (workType: string) => (
+                            <Badge
+                              key={workType}
+                              variant="outline"
+                              className="text-xs"
+                            >
+                              {getWorkTypeLabel(workType)}
+                            </Badge>
+                          ),
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="py-4 text-right">
                       <div
                         className={`font-medium ${getBalanceColor(client.balance)}`}
                       >
-                        {formatCurrency(Math.abs(client.balance))}
+                        {formatCurrency(-client.balance)}
                       </div>
                     </TableCell>
                     <TableCell className="py-4">
@@ -509,7 +531,7 @@ export function ClientList({
                     <span
                       className={`text-sm font-medium ${getBalanceColor(client.balance)}`}
                     >
-                      {formatCurrency(Math.abs(client.balance))}
+                      {formatCurrency(-client.balance)}
                     </span>
                   </div>
                 </div>

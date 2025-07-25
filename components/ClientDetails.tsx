@@ -5,11 +5,9 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { Id } from "../convex/_generated/dataModel";
 import { Work } from "../lib/types";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Skeleton } from "./ui/skeleton";
-import { Alert, AlertDescription } from "./ui/alert";
 import {
   Dialog,
   DialogContent,
@@ -44,7 +42,6 @@ import {
   CreditCard,
   FileText,
   Edit,
-  Trash2,
   Calendar,
   IndianRupee,
   History,
@@ -107,7 +104,7 @@ export function ClientDetails({
           Client not found
         </h3>
         <p className="text-gray-500">
-          This client may have been deleted or doesn't exist.
+          This client may have been deleted or doesn&apos;t exist.
         </p>
       </div>
     );
@@ -116,17 +113,17 @@ export function ClientDetails({
   const getBalanceInfo = (balance: number) => {
     if (balance > 0) {
       return {
-        label: "Client Owes",
-        color: "text-green-600",
-        bgColor: "bg-green-50",
-        iconColor: "text-green-600",
+        label: "Client Balance",
+        color: "text-red-600",
+        bgColor: "bg-red-50",
+        iconColor: "text-red-600",
       };
     } else if (balance < 0) {
       return {
         label: "You Owe",
-        color: "text-red-600",
-        bgColor: "bg-red-50",
-        iconColor: "text-red-600",
+        color: "text-green-600",
+        bgColor: "bg-green-50",
+        iconColor: "text-green-600",
       };
     } else {
       return {
@@ -244,7 +241,7 @@ export function ClientDetails({
             <div>
               <p className="text-sm text-gray-500">{balanceInfo.label}</p>
               <p className={`text-2xl font-semibold ${balanceInfo.color}`}>
-                {formatCurrency(Math.abs(client.balance))}
+                {formatCurrency(-client.balance)}
               </p>
             </div>
           </div>
@@ -282,7 +279,9 @@ export function ClientDetails({
         ].map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
+            onClick={() =>
+              setActiveTab(tab.id as "overview" | "history" | "balance")
+            }
             className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all duration-200 ${
               activeTab === tab.id
                 ? "bg-white text-gray-900 shadow-sm"
@@ -428,10 +427,24 @@ export function ClientDetails({
             </div>
             <div className="space-y-4">
               <div>
-                <p className="text-sm text-gray-500 mb-2">Usual Work Type</p>
-                <Badge variant="outline" className="border-gray-200">
-                  {getWorkTypeLabel(client.usualWorkType)}
-                </Badge>
+                <p className="text-sm text-gray-500 mb-2">Usual Work Types</p>
+                <div className="flex flex-wrap gap-2">
+                  {client.usualWorkTypes && client.usualWorkTypes.length > 0 ? (
+                    client.usualWorkTypes.map((workType) => (
+                      <Badge
+                        key={workType}
+                        variant="outline"
+                        className="border-gray-200"
+                      >
+                        {getWorkTypeLabel(workType)}
+                      </Badge>
+                    ))
+                  ) : (
+                    <Badge variant="outline" className="border-gray-200">
+                      {getWorkTypeLabel("others")}
+                    </Badge>
+                  )}
+                </div>
               </div>
 
               <div>
@@ -442,6 +455,48 @@ export function ClientDetails({
               </div>
             </div>
           </div>
+
+          {/* Additional Information - Show if password or PT ID exists */}
+          {(client.password || client.ptId) && (
+            <div className="bg-white border border-gray-200 rounded-lg p-6 lg:col-span-2">
+              <div className="flex items-center gap-2 mb-4">
+                <FileText className="h-5 w-5 text-gray-500" />
+                <h3 className="text-lg font-medium text-gray-900">
+                  Additional Information
+                </h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {client.password && (
+                  <div className="flex items-center gap-3">
+                    <CreditCard className="h-4 w-4 text-gray-400" />
+                    <div>
+                      <p className="text-sm text-gray-500">
+                        Income Tax Password
+                      </p>
+                      <p className="text-sm font-medium font-mono text-gray-900">
+                        {"•".repeat(client.password.length)}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        Password is masked for security
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {client.ptId && (
+                  <div className="flex items-center gap-3">
+                    <CreditCard className="h-4 w-4 text-gray-400" />
+                    <div>
+                      <p className="text-sm text-gray-500">P-Tax ID</p>
+                      <p className="text-sm font-medium font-mono text-gray-900">
+                        {client.ptId}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -553,12 +608,26 @@ export function ClientDetails({
                             </div>
                           </TableCell>
                           <TableCell className="py-4">
-                            <Badge
-                              variant="outline"
-                              className="border-gray-200"
-                            >
-                              {getWorkTypeLabel(work.workType)}
-                            </Badge>
+                            <div className="flex flex-wrap gap-1">
+                              {work.workTypes && work.workTypes.length > 0 ? (
+                                work.workTypes.map((workType) => (
+                                  <Badge
+                                    key={workType}
+                                    variant="outline"
+                                    className="border-gray-200 text-xs"
+                                  >
+                                    {getWorkTypeLabel(workType)}
+                                  </Badge>
+                                ))
+                              ) : (
+                                <Badge
+                                  variant="outline"
+                                  className="border-gray-200"
+                                >
+                                  {getWorkTypeLabel("others")}
+                                </Badge>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="py-4 text-right text-sm text-gray-900">
                             {formatCurrency(work.totalPrice)}
@@ -569,22 +638,22 @@ export function ClientDetails({
                           <TableCell className="py-4 text-right">
                             <div className="flex items-center justify-end gap-1">
                               {work.workBalance > 0 ? (
-                                <TrendingUp className="h-3 w-3 text-green-600" />
+                                <TrendingUp className="h-3 w-3 text-red-600" />
                               ) : work.workBalance < 0 ? (
-                                <TrendingDown className="h-3 w-3 text-red-600" />
+                                <TrendingDown className="h-3 w-3 text-green-600" />
                               ) : null}
                               <span
-                                className={`text-sm ${work.workBalance > 0 ? "text-green-600" : work.workBalance < 0 ? "text-red-600" : "text-gray-600"}`}
+                                className={`text-sm ${work.workBalance > 0 ? "text-red-600" : work.workBalance < 0 ? "text-green-600" : "text-gray-600"}`}
                               >
-                                {formatCurrency(Math.abs(work.workBalance))}
+                                {formatCurrency(-work.workBalance)}
                               </span>
                             </div>
                           </TableCell>
                           <TableCell className="py-4 text-right">
                             <span
-                              className={`text-sm font-medium ${work.runningBalance > 0 ? "text-green-600" : work.runningBalance < 0 ? "text-red-600" : "text-gray-600"}`}
+                              className={`text-sm font-medium ${work.runningBalance > 0 ? "text-red-600" : work.runningBalance < 0 ? "text-green-600" : "text-gray-600"}`}
                             >
-                              {formatCurrency(Math.abs(work.runningBalance))}
+                              {formatCurrency(-work.runningBalance)}
                             </span>
                           </TableCell>
                           <TableCell className="py-4">

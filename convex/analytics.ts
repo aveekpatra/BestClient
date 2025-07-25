@@ -4,24 +4,28 @@ import { Doc } from "./_generated/dataModel";
 
 // Helper function to parse DD/MM/YYYY date to timestamp for comparison
 function parseIndianDate(dateStr: string): number {
-  const [day, month, year] = dateStr.split('/').map(Number);
+  const [day, month, year] = dateStr.split("/").map(Number);
   return new Date(year, month - 1, day).getTime();
 }
 
 // Helper function to check if a date is within a range
-function isDateInRange(dateStr: string, fromDate?: string, toDate?: string): boolean {
+function isDateInRange(
+  dateStr: string,
+  fromDate?: string,
+  toDate?: string,
+): boolean {
   if (!fromDate && !toDate) return true;
-  
+
   const date = parseIndianDate(dateStr);
   const from = fromDate ? parseIndianDate(fromDate) : 0;
   const to = toDate ? parseIndianDate(toDate) : Date.now();
-  
+
   return date >= from && date <= to;
 }
 
 // Helper function to get month/year key from DD/MM/YYYY date
 function getMonthYearKey(dateStr: string): string {
-  const [, month, year] = dateStr.split('/');
+  const [, month, year] = dateStr.split("/");
   return `${month}/${year}`;
 }
 
@@ -34,29 +38,44 @@ export const getOverviewStats = query({
   handler: async (ctx, args) => {
     // Get all clients
     const clients = await ctx.db.query("clients").collect();
-    
+
     // Get all works (filtered by date if provided)
     const allWorks = await ctx.db.query("works").collect();
-    const works = allWorks.filter(work => 
-      isDateInRange(work.transactionDate, args.dateFrom, args.dateTo)
+    const works = allWorks.filter((work) =>
+      isDateInRange(work.transactionDate, args.dateFrom, args.dateTo),
     );
 
     // Calculate overview statistics
     const totalClients = clients.length;
     const totalWorks = works.length;
     const totalIncome = works.reduce((sum, work) => sum + work.paidAmount, 0);
-    const totalDue = works.reduce((sum, work) => sum + (work.totalPrice - work.paidAmount), 0);
+    const totalDue = works.reduce(
+      (sum, work) => sum + (work.totalPrice - work.paidAmount),
+      0,
+    );
     const totalValue = works.reduce((sum, work) => sum + work.totalPrice, 0);
 
     // Payment status breakdown
-    const paidWorks = works.filter(work => work.paymentStatus === "paid").length;
-    const partialWorks = works.filter(work => work.paymentStatus === "partial").length;
-    const unpaidWorks = works.filter(work => work.paymentStatus === "unpaid").length;
+    const paidWorks = works.filter(
+      (work) => work.paymentStatus === "paid",
+    ).length;
+    const partialWorks = works.filter(
+      (work) => work.paymentStatus === "partial",
+    ).length;
+    const unpaidWorks = works.filter(
+      (work) => work.paymentStatus === "unpaid",
+    ).length;
 
     // Client balance breakdown
-    const clientsWithPositiveBalance = clients.filter(client => client.balance > 0).length;
-    const clientsWithNegativeBalance = clients.filter(client => client.balance < 0).length;
-    const clientsWithZeroBalance = clients.filter(client => client.balance === 0).length;
+    const clientsWithPositiveBalance = clients.filter(
+      (client) => client.balance > 0,
+    ).length;
+    const clientsWithNegativeBalance = clients.filter(
+      (client) => client.balance < 0,
+    ).length;
+    const clientsWithZeroBalance = clients.filter(
+      (client) => client.balance === 0,
+    ).length;
 
     return {
       totalClients,
@@ -87,21 +106,24 @@ export const getIncomeAnalytics = query({
   },
   handler: async (ctx, args) => {
     const allWorks = await ctx.db.query("works").collect();
-    const works = allWorks.filter(work => 
-      isDateInRange(work.transactionDate, args.dateFrom, args.dateTo)
+    const works = allWorks.filter((work) =>
+      isDateInRange(work.transactionDate, args.dateFrom, args.dateTo),
     );
 
     if (args.groupBy === "month") {
       // Group by month/year
-      const monthlyIncome: Record<string, { income: number; due: number; total: number; count: number }> = {};
-      
-      works.forEach(work => {
+      const monthlyIncome: Record<
+        string,
+        { income: number; due: number; total: number; count: number }
+      > = {};
+
+      works.forEach((work) => {
         const monthKey = getMonthYearKey(work.transactionDate);
         if (!monthlyIncome[monthKey]) {
           monthlyIncome[monthKey] = { income: 0, due: 0, total: 0, count: 0 };
         }
         monthlyIncome[monthKey].income += work.paidAmount;
-        monthlyIncome[monthKey].due += (work.totalPrice - work.paidAmount);
+        monthlyIncome[monthKey].due += work.totalPrice - work.paidAmount;
         monthlyIncome[monthKey].total += work.totalPrice;
         monthlyIncome[monthKey].count += 1;
       });
@@ -110,24 +132,38 @@ export const getIncomeAnalytics = query({
       const monthlyData = Object.entries(monthlyIncome)
         .map(([month, data]) => ({ month, ...data }))
         .sort((a, b) => {
-          const [monthA, yearA] = a.month.split('/').map(Number);
-          const [monthB, yearB] = b.month.split('/').map(Number);
+          const [monthA, yearA] = a.month.split("/").map(Number);
+          const [monthB, yearB] = b.month.split("/").map(Number);
           return yearA !== yearB ? yearA - yearB : monthA - monthB;
         });
 
       return { monthlyData };
     } else if (args.groupBy === "workType") {
       // Group by work type
-      const workTypeIncome: Record<string, { income: number; due: number; total: number; count: number }> = {};
-      
-      works.forEach(work => {
-        if (!workTypeIncome[work.workType]) {
-          workTypeIncome[work.workType] = { income: 0, due: 0, total: 0, count: 0 };
+      const workTypeIncome: Record<
+        string,
+        { income: number; due: number; total: number; count: number }
+      > = {};
+
+      works.forEach((work) => {
+        // Handle multiple work types - use the first one or 'others' as fallback
+        const primaryWorkType =
+          work.workTypes && work.workTypes.length > 0
+            ? work.workTypes[0]
+            : "others";
+        if (!workTypeIncome[primaryWorkType]) {
+          workTypeIncome[primaryWorkType] = {
+            income: 0,
+            due: 0,
+            total: 0,
+            count: 0,
+          };
         }
-        workTypeIncome[work.workType].income += work.paidAmount;
-        workTypeIncome[work.workType].due += (work.totalPrice - work.paidAmount);
-        workTypeIncome[work.workType].total += work.totalPrice;
-        workTypeIncome[work.workType].count += 1;
+        workTypeIncome[primaryWorkType].income += work.paidAmount;
+        workTypeIncome[primaryWorkType].due +=
+          work.totalPrice - work.paidAmount;
+        workTypeIncome[primaryWorkType].total += work.totalPrice;
+        workTypeIncome[primaryWorkType].count += 1;
       });
 
       const workTypeData = Object.entries(workTypeIncome)
@@ -138,7 +174,10 @@ export const getIncomeAnalytics = query({
     } else {
       // Return overall totals
       const totalIncome = works.reduce((sum, work) => sum + work.paidAmount, 0);
-      const totalDue = works.reduce((sum, work) => sum + (work.totalPrice - work.paidAmount), 0);
+      const totalDue = works.reduce(
+        (sum, work) => sum + (work.totalPrice - work.paidAmount),
+        0,
+      );
       const totalValue = works.reduce((sum, work) => sum + work.totalPrice, 0);
       const totalCount = works.length;
 
@@ -164,24 +203,27 @@ export const getClientAnalytics = query({
   handler: async (ctx, args) => {
     const clients = await ctx.db.query("clients").collect();
     const allWorks = await ctx.db.query("works").collect();
-    const works = allWorks.filter(work => 
-      isDateInRange(work.transactionDate, args.dateFrom, args.dateTo)
+    const works = allWorks.filter((work) =>
+      isDateInRange(work.transactionDate, args.dateFrom, args.dateTo),
     );
 
     // Calculate client performance
-    const clientPerformance: Record<string, {
-      clientId: string;
-      clientName: string;
-      totalIncome: number;
-      totalDue: number;
-      totalValue: number;
-      workCount: number;
-      currentBalance: number;
-      usualWorkType: string;
-    }> = {};
+    const clientPerformance: Record<
+      string,
+      {
+        clientId: string;
+        clientName: string;
+        totalIncome: number;
+        totalDue: number;
+        totalValue: number;
+        workCount: number;
+        currentBalance: number;
+        usualWorkType: string;
+      }
+    > = {};
 
     // Initialize all clients
-    clients.forEach(client => {
+    clients.forEach((client) => {
       clientPerformance[client._id] = {
         clientId: client._id,
         clientName: client.name,
@@ -190,15 +232,19 @@ export const getClientAnalytics = query({
         totalValue: 0,
         workCount: 0,
         currentBalance: client.balance,
-        usualWorkType: client.usualWorkType,
+        usualWorkType:
+          client.usualWorkTypes && client.usualWorkTypes.length > 0
+            ? client.usualWorkTypes[0]
+            : "others",
       };
     });
 
     // Aggregate work data by client
-    works.forEach(work => {
+    works.forEach((work) => {
       if (clientPerformance[work.clientId]) {
         clientPerformance[work.clientId].totalIncome += work.paidAmount;
-        clientPerformance[work.clientId].totalDue += (work.totalPrice - work.paidAmount);
+        clientPerformance[work.clientId].totalDue +=
+          work.totalPrice - work.paidAmount;
         clientPerformance[work.clientId].totalValue += work.totalPrice;
         clientPerformance[work.clientId].workCount += 1;
       }
@@ -206,7 +252,7 @@ export const getClientAnalytics = query({
 
     // Convert to array and sort by total income
     const clientData = Object.values(clientPerformance)
-      .filter(client => client.workCount > 0) // Only include clients with works in the period
+      .filter((client) => client.workCount > 0) // Only include clients with works in the period
       .sort((a, b) => b.totalIncome - a.totalIncome);
 
     // Get top clients (limited)
@@ -215,8 +261,13 @@ export const getClientAnalytics = query({
 
     // Client distribution by work type
     const workTypeDistribution: Record<string, number> = {};
-    clients.forEach(client => {
-      workTypeDistribution[client.usualWorkType] = (workTypeDistribution[client.usualWorkType] || 0) + 1;
+    clients.forEach((client) => {
+      const primaryWorkType =
+        client.usualWorkTypes && client.usualWorkTypes.length > 0
+          ? client.usualWorkTypes[0]
+          : "others";
+      workTypeDistribution[primaryWorkType] =
+        (workTypeDistribution[primaryWorkType] || 0) + 1;
     });
 
     const workTypeDistributionData = Object.entries(workTypeDistribution)
@@ -240,27 +291,34 @@ export const getServiceAnalytics = query({
   },
   handler: async (ctx, args) => {
     const allWorks = await ctx.db.query("works").collect();
-    const works = allWorks.filter(work => 
-      isDateInRange(work.transactionDate, args.dateFrom, args.dateTo)
+    const works = allWorks.filter((work) =>
+      isDateInRange(work.transactionDate, args.dateFrom, args.dateTo),
     );
 
     // Aggregate service performance
-    const servicePerformance: Record<string, {
-      workType: string;
-      totalIncome: number;
-      totalDue: number;
-      totalValue: number;
-      workCount: number;
-      averageValue: number;
-      paidCount: number;
-      partialCount: number;
-      unpaidCount: number;
-    }> = {};
+    const servicePerformance: Record<
+      string,
+      {
+        workType: string;
+        totalIncome: number;
+        totalDue: number;
+        totalValue: number;
+        workCount: number;
+        averageValue: number;
+        paidCount: number;
+        partialCount: number;
+        unpaidCount: number;
+      }
+    > = {};
 
-    works.forEach(work => {
-      if (!servicePerformance[work.workType]) {
-        servicePerformance[work.workType] = {
-          workType: work.workType,
+    works.forEach((work) => {
+      const primaryWorkType =
+        work.workTypes && work.workTypes.length > 0
+          ? work.workTypes[0]
+          : "others";
+      if (!servicePerformance[primaryWorkType]) {
+        servicePerformance[primaryWorkType] = {
+          workType: primaryWorkType,
           totalIncome: 0,
           totalDue: 0,
           totalValue: 0,
@@ -272,9 +330,9 @@ export const getServiceAnalytics = query({
         };
       }
 
-      const service = servicePerformance[work.workType];
+      const service = servicePerformance[primaryWorkType];
       service.totalIncome += work.paidAmount;
-      service.totalDue += (work.totalPrice - work.paidAmount);
+      service.totalDue += work.totalPrice - work.paidAmount;
       service.totalValue += work.totalPrice;
       service.workCount += 1;
 
@@ -286,20 +344,26 @@ export const getServiceAnalytics = query({
 
     // Calculate averages and sort by income
     const serviceData = Object.values(servicePerformance)
-      .map(service => ({
+      .map((service) => ({
         ...service,
-        averageValue: service.workCount > 0 ? service.totalValue / service.workCount : 0,
+        averageValue:
+          service.workCount > 0 ? service.totalValue / service.workCount : 0,
       }))
       .sort((a, b) => b.totalIncome - a.totalIncome);
 
     // Get service trends (monthly breakdown for each service)
     const serviceTrends: Record<string, Record<string, number>> = {};
-    works.forEach(work => {
+    works.forEach((work) => {
       const monthKey = getMonthYearKey(work.transactionDate);
-      if (!serviceTrends[work.workType]) {
-        serviceTrends[work.workType] = {};
+      const primaryWorkType =
+        work.workTypes && work.workTypes.length > 0
+          ? work.workTypes[0]
+          : "others";
+      if (!serviceTrends[primaryWorkType]) {
+        serviceTrends[primaryWorkType] = {};
       }
-      serviceTrends[work.workType][monthKey] = (serviceTrends[work.workType][monthKey] || 0) + work.paidAmount;
+      serviceTrends[primaryWorkType][monthKey] =
+        (serviceTrends[primaryWorkType][monthKey] || 0) + work.paidAmount;
     });
 
     return {
@@ -318,43 +382,55 @@ export const getPaymentAnalytics = query({
   },
   handler: async (ctx, args) => {
     const allWorks = await ctx.db.query("works").collect();
-    const works = allWorks.filter(work => 
-      isDateInRange(work.transactionDate, args.dateFrom, args.dateTo)
+    const works = allWorks.filter((work) =>
+      isDateInRange(work.transactionDate, args.dateFrom, args.dateTo),
     );
 
     // Overall payment statistics
     const totalValue = works.reduce((sum, work) => sum + work.totalPrice, 0);
     const totalPaid = works.reduce((sum, work) => sum + work.paidAmount, 0);
     const totalDue = totalValue - totalPaid;
-    const collectionEfficiency = totalValue > 0 ? (totalPaid / totalValue) * 100 : 0;
+    const collectionEfficiency =
+      totalValue > 0 ? (totalPaid / totalValue) * 100 : 0;
 
     // Payment status breakdown
     const paymentStatusBreakdown = {
       paid: {
-        count: works.filter(work => work.paymentStatus === "paid").length,
-        value: works.filter(work => work.paymentStatus === "paid").reduce((sum, work) => sum + work.totalPrice, 0),
+        count: works.filter((work) => work.paymentStatus === "paid").length,
+        value: works
+          .filter((work) => work.paymentStatus === "paid")
+          .reduce((sum, work) => sum + work.totalPrice, 0),
       },
       partial: {
-        count: works.filter(work => work.paymentStatus === "partial").length,
-        value: works.filter(work => work.paymentStatus === "partial").reduce((sum, work) => sum + work.totalPrice, 0),
-        paid: works.filter(work => work.paymentStatus === "partial").reduce((sum, work) => sum + work.paidAmount, 0),
+        count: works.filter((work) => work.paymentStatus === "partial").length,
+        value: works
+          .filter((work) => work.paymentStatus === "partial")
+          .reduce((sum, work) => sum + work.totalPrice, 0),
+        paid: works
+          .filter((work) => work.paymentStatus === "partial")
+          .reduce((sum, work) => sum + work.paidAmount, 0),
       },
       unpaid: {
-        count: works.filter(work => work.paymentStatus === "unpaid").length,
-        value: works.filter(work => work.paymentStatus === "unpaid").reduce((sum, work) => sum + work.totalPrice, 0),
+        count: works.filter((work) => work.paymentStatus === "unpaid").length,
+        value: works
+          .filter((work) => work.paymentStatus === "unpaid")
+          .reduce((sum, work) => sum + work.totalPrice, 0),
       },
     };
 
     // Monthly collection trends
-    const monthlyCollection: Record<string, {
-      totalValue: number;
-      totalPaid: number;
-      totalDue: number;
-      efficiency: number;
-      workCount: number;
-    }> = {};
+    const monthlyCollection: Record<
+      string,
+      {
+        totalValue: number;
+        totalPaid: number;
+        totalDue: number;
+        efficiency: number;
+        workCount: number;
+      }
+    > = {};
 
-    works.forEach(work => {
+    works.forEach((work) => {
       const monthKey = getMonthYearKey(work.transactionDate);
       if (!monthlyCollection[monthKey]) {
         monthlyCollection[monthKey] = {
@@ -368,48 +444,55 @@ export const getPaymentAnalytics = query({
 
       monthlyCollection[monthKey].totalValue += work.totalPrice;
       monthlyCollection[monthKey].totalPaid += work.paidAmount;
-      monthlyCollection[monthKey].totalDue += (work.totalPrice - work.paidAmount);
+      monthlyCollection[monthKey].totalDue += work.totalPrice - work.paidAmount;
       monthlyCollection[monthKey].workCount += 1;
     });
 
     // Calculate monthly efficiency
-    Object.values(monthlyCollection).forEach(month => {
-      month.efficiency = month.totalValue > 0 ? (month.totalPaid / month.totalValue) * 100 : 0;
+    Object.values(monthlyCollection).forEach((month) => {
+      month.efficiency =
+        month.totalValue > 0 ? (month.totalPaid / month.totalValue) * 100 : 0;
     });
 
     const monthlyData = Object.entries(monthlyCollection)
       .map(([month, data]) => ({ month, ...data }))
       .sort((a, b) => {
-        const [monthA, yearA] = a.month.split('/').map(Number);
-        const [monthB, yearB] = b.month.split('/').map(Number);
+        const [monthA, yearA] = a.month.split("/").map(Number);
+        const [monthB, yearB] = b.month.split("/").map(Number);
         return yearA !== yearB ? yearA - yearB : monthA - monthB;
       });
 
     // Outstanding amounts by work type
-    const outstandingByWorkType: Record<string, {
-      workType: string;
-      totalDue: number;
-      workCount: number;
-      averageDue: number;
-    }> = {};
-
-    works.filter(work => work.totalPrice > work.paidAmount).forEach(work => {
-      const due = work.totalPrice - work.paidAmount;
-      if (!outstandingByWorkType[work.workType]) {
-        outstandingByWorkType[work.workType] = {
-          workType: work.workType,
-          totalDue: 0,
-          workCount: 0,
-          averageDue: 0,
-        };
+    const outstandingByWorkType: Record<
+      string,
+      {
+        workType: string;
+        totalDue: number;
+        workCount: number;
+        averageDue: number;
       }
+    > = {};
 
-      outstandingByWorkType[work.workType].totalDue += due;
-      outstandingByWorkType[work.workType].workCount += 1;
-    });
+    works
+      .filter((work) => work.totalPrice > work.paidAmount)
+      .forEach((work) => {
+        const due = work.totalPrice - work.paidAmount;
+        const primaryWorkType = work.workTypes && work.workTypes.length > 0 ? work.workTypes[0] : 'others';
+        if (!outstandingByWorkType[primaryWorkType]) {
+          outstandingByWorkType[primaryWorkType] = {
+            workType: primaryWorkType,
+            totalDue: 0,
+            workCount: 0,
+            averageDue: 0,
+          };
+        }
+
+        outstandingByWorkType[primaryWorkType].totalDue += due;
+        outstandingByWorkType[primaryWorkType].workCount += 1;
+      });
 
     const outstandingData = Object.values(outstandingByWorkType)
-      .map(item => ({
+      .map((item) => ({
         ...item,
         averageDue: item.workCount > 0 ? item.totalDue / item.workCount : 0,
       }))

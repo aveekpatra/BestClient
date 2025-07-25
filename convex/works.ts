@@ -2,20 +2,34 @@ import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 
+// Helper function to get work types
+function getWorkTypes(work: any): string[] {
+  return work.workTypes || ["online-work"];
+}
+
 // Helper function to determine payment status
-function determinePaymentStatus(totalPrice: number, paidAmount: number): "paid" | "partial" | "unpaid" {
+function determinePaymentStatus(
+  totalPrice: number,
+  paidAmount: number,
+): "paid" | "partial" | "unpaid" {
   if (paidAmount <= 0) return "unpaid";
   if (paidAmount >= totalPrice) return "paid";
   return "partial";
 }
 
-// Helper function to calculate balance (total price - paid amount)
-function calculateBalance(totalPrice: number, paidAmount: number): number {
-  return totalPrice - paidAmount;
-}
-
 // Helper function to update client balance and create history entry
-async function updateClientBalance(ctx: any, clientId: Id<"clients">, workId?: Id<"works">, changeType: "work_created" | "work_updated" | "work_deleted" = "work_updated", description?: string) {
+async function updateClientBalance(
+  ctx: any,
+  clientId: Id<"clients">,
+  balanceChange: number,
+  workId?: Id<"works">,
+  changeType:
+    | "work_created"
+    | "work_updated"
+    | "work_deleted"
+    | "payment_made" = "work_updated",
+  description?: string,
+) {
   // Get current client data
   const client = await ctx.db.get(clientId);
   if (!client) {
@@ -23,17 +37,7 @@ async function updateClientBalance(ctx: any, clientId: Id<"clients">, workId?: I
   }
 
   const previousBalance = client.balance;
-
-  // Get all works for this client
-  const works = await ctx.db
-    .query("works")
-    .withIndex("by_client", (q: any) => q.eq("clientId", clientId))
-    .collect();
-
-  // Calculate total balance (sum of all work balances)
-  const newBalance = works.reduce((sum: number, work: any) => {
-    return sum + calculateBalance(work.totalPrice, work.paidAmount);
-  }, 0);
+  const newBalance = previousBalance + balanceChange;
 
   // Update client balance
   await ctx.db.patch(clientId, {
@@ -42,15 +46,17 @@ async function updateClientBalance(ctx: any, clientId: Id<"clients">, workId?: I
   });
 
   // Create balance history entry if balance changed
-  if (previousBalance !== newBalance) {
+  if (balanceChange !== 0) {
     await ctx.db.insert("balanceHistory", {
       clientId,
       workId,
       previousBalance,
       newBalance,
-      balanceChange: newBalance - previousBalance,
+      balanceChange,
       changeType,
-      description: description || `Balance updated due to ${changeType.replace('_', ' ')}`,
+      description:
+        description ||
+        `Balance updated: ${balanceChange > 0 ? "+" : ""}${balanceChange}`,
       createdAt: Date.now(),
     });
   }
@@ -63,13 +69,16 @@ export const createWork = mutation({
     transactionDate: v.string(),
     totalPrice: v.number(),
     paidAmount: v.number(),
-    workType: v.union(
-      v.literal("online-work"),
-      v.literal("health-insurance"),
-      v.literal("life-insurance"),
-      v.literal("income-tax"),
-      v.literal("mutual-funds"),
-      v.literal("others")
+    workTypes: v.array(
+      v.union(
+        v.literal("online-work"),
+        v.literal("health-insurance"),
+        v.literal("life-insurance"),
+        v.literal("income-tax"),
+        v.literal("p-tax"),
+        v.literal("mutual-funds"),
+        v.literal("others"),
+      ),
     ),
     description: v.string(),
   },
@@ -87,12 +96,15 @@ export const createWork = mutation({
     if (args.paidAmount < 0) {
       throw new Error("Paid amount cannot be negative");
     }
-    if (args.paidAmount > args.totalPrice) {
-      throw new Error("Paid amount cannot exceed total price");
+    if (args.paidAmount < 0) {
+      throw new Error("Paid amount cannot be negative");
     }
 
     // Determine payment status
-    const paymentStatus = determinePaymentStatus(args.totalPrice, args.paidAmount);
+    const paymentStatus = determinePaymentStatus(
+      args.totalPrice,
+      args.paidAmount,
+    );
 
     // Create the work
     const workId = await ctx.db.insert("works", {
@@ -100,15 +112,23 @@ export const createWork = mutation({
       transactionDate: args.transactionDate,
       totalPrice: args.totalPrice,
       paidAmount: args.paidAmount,
-      workType: args.workType,
+      workTypes: args.workTypes,
       description: args.description,
       paymentStatus,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
 
-    // Update client balance and create history entry
-    await updateClientBalance(ctx, args.clientId, workId, "work_created", `Work created: ${args.description}`);
+    // Update client balance: add work amount, subtract payment
+    const balanceChange = args.totalPrice - args.paidAmount;
+    await updateClientBalance(
+      ctx,
+      args.clientId,
+      balanceChange,
+      workId,
+      "work_created",
+      `Work created: ${args.description} (₹${args.totalPrice / 100} work, ₹${args.paidAmount / 100} paid)`,
+    );
 
     return workId;
   },
@@ -122,14 +142,19 @@ export const updateWork = mutation({
     transactionDate: v.optional(v.string()),
     totalPrice: v.optional(v.number()),
     paidAmount: v.optional(v.number()),
-    workType: v.optional(v.union(
-      v.literal("online-work"),
-      v.literal("health-insurance"),
-      v.literal("life-insurance"),
-      v.literal("income-tax"),
-      v.literal("mutual-funds"),
-      v.literal("others")
-    )),
+    workTypes: v.optional(
+      v.array(
+        v.union(
+          v.literal("online-work"),
+          v.literal("health-insurance"),
+          v.literal("life-insurance"),
+          v.literal("income-tax"),
+          v.literal("p-tax"),
+          v.literal("mutual-funds"),
+          v.literal("others"),
+        ),
+      ),
+    ),
     description: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -157,9 +182,6 @@ export const updateWork = mutation({
     if (paidAmount < 0) {
       throw new Error("Paid amount cannot be negative");
     }
-    if (paidAmount > totalPrice) {
-      throw new Error("Paid amount cannot exceed total price");
-    }
 
     // Determine payment status
     const paymentStatus = determinePaymentStatus(totalPrice, paidAmount);
@@ -170,20 +192,52 @@ export const updateWork = mutation({
       ...(args.transactionDate && { transactionDate: args.transactionDate }),
       ...(args.totalPrice !== undefined && { totalPrice: args.totalPrice }),
       ...(args.paidAmount !== undefined && { paidAmount: args.paidAmount }),
-      ...(args.workType && { workType: args.workType }),
+      ...(args.workTypes && { workTypes: args.workTypes }),
       ...(args.description && { description: args.description }),
       paymentStatus,
       updatedAt: Date.now(),
     });
 
-    // Update balance for old client if client changed
-    if (args.clientId && args.clientId !== existingWork.clientId) {
-      await updateClientBalance(ctx, existingWork.clientId, args.id, "work_updated", `Work moved from client`);
-    }
+    // Calculate balance changes
+    const oldBalance = existingWork.totalPrice - existingWork.paidAmount;
+    const newBalance = totalPrice - paidAmount;
+    const balanceChange = newBalance - oldBalance;
 
-    // Update balance for current client
-    const currentClientId = args.clientId ?? existingWork.clientId;
-    await updateClientBalance(ctx, currentClientId, args.id, "work_updated", `Work updated: ${args.description || existingWork.description}`);
+    // Handle client change
+    if (args.clientId && args.clientId !== existingWork.clientId) {
+      // Remove old work impact from old client
+      await updateClientBalance(
+        ctx,
+        existingWork.clientId,
+        -oldBalance,
+        args.id,
+        "work_updated",
+        `Work moved to another client: -₹${oldBalance / 100}`,
+      );
+
+      // Add new work impact to new client
+      await updateClientBalance(
+        ctx,
+        args.clientId,
+        newBalance,
+        args.id,
+        "work_updated",
+        `Work moved from another client: +₹${newBalance / 100}`,
+      );
+    } else {
+      // Same client, just update the difference
+      const currentClientId = args.clientId ?? existingWork.clientId;
+      if (balanceChange !== 0) {
+        await updateClientBalance(
+          ctx,
+          currentClientId,
+          balanceChange,
+          args.id,
+          "work_updated",
+          `Work updated: ${args.description || existingWork.description} (${balanceChange > 0 ? "+" : ""}₹${balanceChange / 100})`,
+        );
+      }
+    }
 
     return args.id;
   },
@@ -203,8 +257,16 @@ export const deleteWork = mutation({
     // Delete the work
     await ctx.db.delete(args.id);
 
-    // Update client balance and create history entry
-    await updateClientBalance(ctx, clientId, args.id, "work_deleted", `Work deleted: ${work.description}`);
+    // Reverse the balance impact of the deleted work
+    const balanceChange = -(work.totalPrice - work.paidAmount);
+    await updateClientBalance(
+      ctx,
+      clientId,
+      balanceChange,
+      args.id,
+      "work_deleted",
+      `Work deleted: ${work.description} (${balanceChange > 0 ? "+" : ""}₹${balanceChange / 100})`,
+    );
 
     return args.id;
   },
@@ -214,19 +276,19 @@ export const deleteWork = mutation({
 export const getWorks = query({
   args: {
     clientId: v.optional(v.id("clients")),
-    workType: v.optional(v.union(
-      v.literal("online-work"),
-      v.literal("health-insurance"),
-      v.literal("life-insurance"),
-      v.literal("income-tax"),
-      v.literal("mutual-funds"),
-      v.literal("others")
-    )),
-    paymentStatus: v.optional(v.union(
-      v.literal("paid"),
-      v.literal("partial"),
-      v.literal("unpaid")
-    )),
+    workType: v.optional(
+      v.union(
+        v.literal("online-work"),
+        v.literal("health-insurance"),
+        v.literal("life-insurance"),
+        v.literal("income-tax"),
+        v.literal("mutual-funds"),
+        v.literal("others"),
+      ),
+    ),
+    paymentStatus: v.optional(
+      v.union(v.literal("paid"), v.literal("partial"), v.literal("unpaid")),
+    ),
     limit: v.optional(v.number()),
     offset: v.optional(v.number()),
   },
@@ -242,23 +304,30 @@ export const getWorks = query({
     } else if (args.paymentStatus) {
       results = await ctx.db
         .query("works")
-        .withIndex("by_payment_status", (q: any) => q.eq("paymentStatus", args.paymentStatus))
+        .withIndex("by_payment_status", (q: any) =>
+          q.eq("paymentStatus", args.paymentStatus),
+        )
         .collect();
     } else if (args.workType) {
-      results = await ctx.db
-        .query("works")
-        .withIndex("by_work_type", (q: any) => q.eq("workType", args.workType))
-        .collect();
+      // Get all works and filter by work type since workTypes is now an array
+      const allWorks = await ctx.db.query("works").collect();
+      results = allWorks.filter(
+        (work) => args.workType && work.workTypes.includes(args.workType),
+      );
     } else {
       results = await ctx.db.query("works").collect();
     }
 
     // Apply additional filters that can't be done with indexes
     if (args.workType && !args.clientId) {
-      results = results.filter(work => work.workType === args.workType);
+      results = results.filter((work) =>
+        getWorkTypes(work).includes(args.workType!),
+      );
     }
     if (args.paymentStatus && !args.clientId) {
-      results = results.filter(work => work.paymentStatus === args.paymentStatus);
+      results = results.filter(
+        (work) => work.paymentStatus === args.paymentStatus,
+      );
     }
 
     // Sort by creation date (newest first)
@@ -296,10 +365,15 @@ export const getWorksByDateRange = query({
   },
   handler: async (ctx, args) => {
     const works = await ctx.db.query("works").collect();
-    
-    return works.filter(work => {
-      return work.transactionDate >= args.dateFrom && work.transactionDate <= args.dateTo;
-    }).sort((a, b) => b.createdAt - a.createdAt);
+
+    return works
+      .filter((work) => {
+        return (
+          work.transactionDate >= args.dateFrom &&
+          work.transactionDate <= args.dateTo
+        );
+      })
+      .sort((a, b) => b.createdAt - a.createdAt);
   },
 });
 
@@ -309,13 +383,15 @@ export const getWorksByPaymentStatus = query({
     paymentStatus: v.union(
       v.literal("paid"),
       v.literal("partial"),
-      v.literal("unpaid")
+      v.literal("unpaid"),
     ),
   },
   handler: async (ctx, args) => {
     return await ctx.db
       .query("works")
-      .withIndex("by_payment_status", (q) => q.eq("paymentStatus", args.paymentStatus))
+      .withIndex("by_payment_status", (q) =>
+        q.eq("paymentStatus", args.paymentStatus),
+      )
       .order("desc")
       .collect();
   },
@@ -334,15 +410,24 @@ export const getWorkStats = query({
   args: {},
   handler: async (ctx, args) => {
     const works = await ctx.db.query("works").collect();
-    
+
     const totalWorks = works.length;
     const totalIncome = works.reduce((sum, work) => sum + work.paidAmount, 0);
-    const totalDue = works.reduce((sum, work) => sum + calculateBalance(work.totalPrice, work.paidAmount), 0);
+    const totalDue = works.reduce(
+      (sum, work) => sum + (work.totalPrice - work.paidAmount),
+      0,
+    );
     const totalValue = works.reduce((sum, work) => sum + work.totalPrice, 0);
-    
-    const paidWorks = works.filter(work => work.paymentStatus === "paid").length;
-    const partialWorks = works.filter(work => work.paymentStatus === "partial").length;
-    const unpaidWorks = works.filter(work => work.paymentStatus === "unpaid").length;
+
+    const paidWorks = works.filter(
+      (work) => work.paymentStatus === "paid",
+    ).length;
+    const partialWorks = works.filter(
+      (work) => work.paymentStatus === "partial",
+    ).length;
+    const unpaidWorks = works.filter(
+      (work) => work.paymentStatus === "unpaid",
+    ).length;
 
     return {
       totalWorks,

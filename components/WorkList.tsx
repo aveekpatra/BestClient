@@ -7,6 +7,7 @@ import { Id } from "../convex/_generated/dataModel";
 import { Work, WorkType, PaymentStatus, Client } from "../lib/types";
 import { formatCurrency, getWorkTypeLabel } from "../lib/utils";
 import PaymentStatusBadge from "./PaymentStatusBadge";
+import { Badge } from "./ui/badge";
 import {
   Table,
   TableBody,
@@ -18,9 +19,27 @@ import {
 
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { Search, Filter, SortAsc, SortDesc, Plus } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import {
+  Search,
+  Filter,
+  Plus,
+  FileText,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  ChevronUp,
+  ChevronDown,
+  Edit,
+  MoreHorizontal,
+} from "lucide-react";
 import { Skeleton } from "./ui/skeleton";
 
 interface WorkFilters {
@@ -43,7 +62,13 @@ interface WorkListProps {
   showSelection?: boolean;
 }
 
-type SortField = "transactionDate" | "totalPrice" | "paidAmount" | "clientName" | "workType" | "paymentStatus";
+type SortField =
+  | "transactionDate"
+  | "totalPrice"
+  | "paidAmount"
+  | "clientName"
+  | "workTypes"
+  | "paymentStatus";
 type SortDirection = "asc" | "desc";
 
 export default function WorkList({
@@ -57,9 +82,8 @@ export default function WorkList({
   const [filters, setFilters] = useState<WorkFilters>({});
   const [sortField, setSortField] = useState<SortField>("transactionDate");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [showFilters, setShowFilters] = useState(false);
-  const itemsPerPage = 10;
+  const [currentPage, setCurrentPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
 
   // Fetch data
   const works = useQuery(api.works.getWorks, {}) as Work[] | undefined;
@@ -68,10 +92,13 @@ export default function WorkList({
   // Create client lookup map
   const clientMap = useMemo(() => {
     if (!clientsData?.clients) return {};
-    return clientsData.clients.reduce((map, client) => {
-      map[client._id] = client;
-      return map;
-    }, {} as Record<Id<"clients">, Client>);
+    return clientsData.clients.reduce(
+      (map, client) => {
+        map[client._id] = client;
+        return map;
+      },
+      {} as Record<Id<"clients">, Client>,
+    );
   }, [clientsData]);
 
   // Filter and sort works
@@ -80,31 +107,46 @@ export default function WorkList({
 
     const filtered = works.filter((work) => {
       const client = clientMap[work.clientId];
-      
+
       // Client filter
       if (filters.clientId && work.clientId !== filters.clientId) return false;
-      
+
       // Work type filter
-      if (filters.workType && work.workType !== filters.workType) return false;
-      
+      if (filters.workType && !work.workTypes.includes(filters.workType))
+        return false;
+
       // Payment status filter
-      if (filters.paymentStatus && work.paymentStatus !== filters.paymentStatus) return false;
-      
+      if (filters.paymentStatus && work.paymentStatus !== filters.paymentStatus)
+        return false;
+
       // Date range filter
-      if (filters.dateFrom && work.transactionDate < filters.dateFrom) return false;
+      if (filters.dateFrom && work.transactionDate < filters.dateFrom)
+        return false;
       if (filters.dateTo && work.transactionDate > filters.dateTo) return false;
-      
+
       // Amount range filter
-      if (filters.amountMin !== undefined && work.totalPrice < filters.amountMin * 100) return false;
-      if (filters.amountMax !== undefined && work.totalPrice > filters.amountMax * 100) return false;
-      
+      if (
+        filters.amountMin !== undefined &&
+        work.totalPrice < filters.amountMin * 100
+      )
+        return false;
+      if (
+        filters.amountMax !== undefined &&
+        work.totalPrice > filters.amountMax * 100
+      )
+        return false;
+
       // Search filter
       if (filters.search) {
         const searchTerm = filters.search.toLowerCase();
         const clientName = client?.name.toLowerCase() || "";
         const description = work.description.toLowerCase();
-        const workTypeLabel = getWorkTypeLabel(work.workType).toLowerCase();
-        
+        const workTypes = work.workTypes || ["online-work"];
+        const workTypeLabel = workTypes
+          .map((wt: string) => getWorkTypeLabel(wt))
+          .join(" ")
+          .toLowerCase();
+
         if (
           !clientName.includes(searchTerm) &&
           !description.includes(searchTerm) &&
@@ -113,7 +155,7 @@ export default function WorkList({
           return false;
         }
       }
-      
+
       return true;
     });
 
@@ -139,9 +181,15 @@ export default function WorkList({
           aValue = clientMap[a.clientId]?.name || "";
           bValue = clientMap[b.clientId]?.name || "";
           break;
-        case "workType":
-          aValue = getWorkTypeLabel(a.workType);
-          bValue = getWorkTypeLabel(b.workType);
+        case "workTypes":
+          const aWorkTypes = a.workTypes || ["online-work"];
+          const bWorkTypes = b.workTypes || ["online-work"];
+          aValue = aWorkTypes
+            .map((wt: string) => getWorkTypeLabel(wt))
+            .join(", ");
+          bValue = bWorkTypes
+            .map((wt: string) => getWorkTypeLabel(wt))
+            .join(", ");
           break;
         case "paymentStatus":
           aValue = a.paymentStatus;
@@ -166,10 +214,11 @@ export default function WorkList({
   }, [works, clientMap, filters, sortField, sortDirection]);
 
   // Pagination
-  const totalPages = Math.ceil(filteredAndSortedWorks.length / itemsPerPage);
+  const total = filteredAndSortedWorks.length;
+  const totalPages = Math.ceil(total / pageSize);
   const paginatedWorks = filteredAndSortedWorks.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+    currentPage * pageSize,
+    (currentPage + 1) * pageSize,
   );
 
   const handleSort = (field: SortField) => {
@@ -179,370 +228,442 @@ export default function WorkList({
       setSortField(field);
       setSortDirection("asc");
     }
+    setCurrentPage(0);
   };
 
-  const handleFilterChange = (key: keyof WorkFilters, value: string | number | undefined) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
-    setCurrentPage(1);
+  const handleFilterChange = (
+    key: keyof WorkFilters,
+    value: string | number | undefined,
+  ) => {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+    setCurrentPage(0);
+  };
+
+  const handlePageSizeChange = (newPageSize: number) => {
+    setPageSize(newPageSize);
+    setCurrentPage(0);
   };
 
   const clearFilters = () => {
     setFilters({});
-    setCurrentPage(1);
+    setCurrentPage(0);
   };
 
   const handleWorkSelection = (workId: Id<"works">, selected: boolean) => {
     if (!onWorkSelectionChange) return;
-    
+
     if (selected) {
       onWorkSelectionChange([...selectedWorks, workId]);
     } else {
-      onWorkSelectionChange(selectedWorks.filter(id => id !== workId));
+      onWorkSelectionChange(selectedWorks.filter((id) => id !== workId));
     }
   };
 
   const handleSelectAll = (selected: boolean) => {
     if (!onWorkSelectionChange) return;
-    
+
     if (selected) {
-      onWorkSelectionChange(paginatedWorks.map(work => work._id));
+      onWorkSelectionChange(paginatedWorks.map((work) => work._id));
     } else {
       onWorkSelectionChange([]);
     }
   };
 
-  const SortIcon = ({ field }: { field: SortField }) => {
+  const getSortIcon = (field: SortField) => {
     if (sortField !== field) return null;
-    return sortDirection === "asc" ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />;
+    return sortDirection === "asc" ? (
+      <ChevronUp className="h-4 w-4 inline ml-1" />
+    ) : (
+      <ChevronDown className="h-4 w-4 inline ml-1" />
+    );
   };
 
   if (!works || !clientsData?.clients) {
     return (
-      <Card>
-        <CardHeader>
+      <div className="space-y-6">
+        {/* Header Skeleton */}
+        <div className="flex items-center justify-between">
           <Skeleton className="h-8 w-48" />
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-16 w-full" />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+          <Skeleton className="h-10 w-32" />
+        </div>
+
+        {/* Table Skeleton */}
+        <div className="space-y-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-16 w-full" />
+          ))}
+        </div>
+      </div>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle>Work Transactions</CardTitle>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowFilters(!showFilters)}
-            >
-              <Filter className="h-4 w-4 mr-2" />
-              Filters
-            </Button>
-            {onAddWork && (
-              <Button onClick={onAddWork}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Work
-              </Button>
-            )}
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-10 h-10 bg-gray-100 rounded-lg">
+            <FileText className="h-5 w-5 text-gray-600" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900">
+              Work Transactions
+            </h1>
+            <p className="text-sm text-gray-500">{total} total transactions</p>
           </div>
         </div>
-
-        {showFilters && (
-          <div className="p-4 bg-gray-50 rounded-lg space-y-4">
-            {/* Mobile-first responsive grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {/* Search - Full width on mobile */}
-              <div className="space-y-2 sm:col-span-2 lg:col-span-1">
-                <label className="text-sm font-medium">Search</label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    placeholder="Search works..."
-                    value={filters.search || ""}
-                    onChange={(e) => handleFilterChange("search", e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Client</label>
-                <Select
-                  value={filters.clientId || ""}
-                  onValueChange={(value) => handleFilterChange("clientId", value || undefined)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="All clients" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">All clients</SelectItem>
-                    {clientsData?.clients?.map((client) => (
-                      <SelectItem key={client._id} value={client._id}>
-                        {client.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Work Type</label>
-                <Select
-                  value={filters.workType || ""}
-                  onValueChange={(value) => handleFilterChange("workType", value || undefined)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="All types" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">All types</SelectItem>
-                    <SelectItem value="online-work">Online Work</SelectItem>
-                    <SelectItem value="health-insurance">Health Insurance</SelectItem>
-                    <SelectItem value="life-insurance">Life Insurance</SelectItem>
-                    <SelectItem value="income-tax">Income Tax</SelectItem>
-                    <SelectItem value="mutual-funds">Mutual Funds</SelectItem>
-                    <SelectItem value="others">Others</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Payment Status</label>
-                <Select
-                  value={filters.paymentStatus || ""}
-                  onValueChange={(value) => handleFilterChange("paymentStatus", value || undefined)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="All statuses" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">All statuses</SelectItem>
-                    <SelectItem value="paid">Paid</SelectItem>
-                    <SelectItem value="partial">Partial</SelectItem>
-                    <SelectItem value="unpaid">Unpaid</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Date and Amount Filters */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Date From</label>
-                <Input
-                  type="date"
-                  value={filters.dateFrom || ""}
-                  onChange={(e) => handleFilterChange("dateFrom", e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Date To</label>
-                <Input
-                  type="date"
-                  value={filters.dateTo || ""}
-                  onChange={(e) => handleFilterChange("dateTo", e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Min Amount (₹)</label>
-                <Input
-                  type="number"
-                  placeholder="0"
-                  value={filters.amountMin || ""}
-                  onChange={(e) => handleFilterChange("amountMin", e.target.value ? Number(e.target.value) : undefined)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Max Amount (₹)</label>
-                <Input
-                  type="number"
-                  placeholder="No limit"
-                  value={filters.amountMax || ""}
-                  onChange={(e) => handleFilterChange("amountMax", e.target.value ? Number(e.target.value) : undefined)}
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end">
-              <Button variant="outline" onClick={clearFilters}>
-                Clear Filters
-              </Button>
-            </div>
-          </div>
+        {onAddWork && (
+          <Button
+            onClick={onAddWork}
+            className="flex items-center gap-2 bg-gray-900 hover:bg-gray-800"
+          >
+            <Plus className="h-4 w-4" />
+            Add Work
+          </Button>
         )}
-      </CardHeader>
+      </div>
 
-      <CardContent>
-        {/* Desktop Table View */}
-        <div className="hidden lg:block rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {showSelection && (
-                  <TableHead className="w-12">
-                    <input
-                      type="checkbox"
-                      checked={paginatedWorks.length > 0 && paginatedWorks.every(work => selectedWorks.includes(work._id))}
-                      onChange={(e) => handleSelectAll(e.target.checked)}
-                      className="rounded border-gray-300"
-                    />
-                  </TableHead>
-                )}
-                <TableHead>
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleSort("transactionDate")}
-                    className="h-auto p-0 font-semibold"
-                  >
-                    Date <SortIcon field="transactionDate" />
-                  </Button>
-                </TableHead>
-                <TableHead>
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleSort("clientName")}
-                    className="h-auto p-0 font-semibold"
-                  >
-                    Client <SortIcon field="clientName" />
-                  </Button>
-                </TableHead>
-                <TableHead>
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleSort("workType")}
-                    className="h-auto p-0 font-semibold"
-                  >
-                    Work Type <SortIcon field="workType" />
-                  </Button>
-                </TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleSort("totalPrice")}
-                    className="h-auto p-0 font-semibold"
-                  >
-                    Total <SortIcon field="totalPrice" />
-                  </Button>
-                </TableHead>
-                <TableHead>
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleSort("paidAmount")}
-                    className="h-auto p-0 font-semibold"
-                  >
-                    Paid <SortIcon field="paidAmount" />
-                  </Button>
-                </TableHead>
-                <TableHead>Balance</TableHead>
-                <TableHead>
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleSort("paymentStatus")}
-                    className="h-auto p-0 font-semibold"
-                  >
-                    Status <SortIcon field="paymentStatus" />
-                  </Button>
-                </TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {paginatedWorks.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={showSelection ? 10 : 9} className="text-center py-8 text-gray-500">
-                    No work transactions found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                paginatedWorks.map((work) => {
-                  const client = clientMap[work.clientId];
-                  const balance = work.totalPrice - work.paidAmount;
-
-                  return (
-                    <TableRow key={work._id}>
-                      {showSelection && (
-                        <TableCell>
-                          <input
-                            type="checkbox"
-                            checked={selectedWorks.includes(work._id)}
-                            onChange={(e) => handleWorkSelection(work._id, e.target.checked)}
-                            className="rounded border-gray-300"
-                          />
-                        </TableCell>
-                      )}
-                      <TableCell>{work.transactionDate}</TableCell>
-                      <TableCell className="font-medium">
-                        {client?.name || "Unknown Client"}
-                      </TableCell>
-                      <TableCell>{getWorkTypeLabel(work.workType)}</TableCell>
-                      <TableCell className="max-w-xs truncate">
-                        {work.description}
-                      </TableCell>
-                      <TableCell>{formatCurrency(work.totalPrice)}</TableCell>
-                      <TableCell>{formatCurrency(work.paidAmount)}</TableCell>
-                      <TableCell className={balance > 0 ? "text-red-600" : balance < 0 ? "text-green-600" : ""}>
-                        {formatCurrency(Math.abs(balance))}
-                      </TableCell>
-                      <TableCell>
-                        <PaymentStatusBadge status={work.paymentStatus} />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {onEditWork && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => onEditWork(work)}
-                            >
-                              Edit
-                            </Button>
-                          )}
-                          {onDeleteWork && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => onDeleteWork(work)}
-                            >
-                              Delete
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
+      {/* Filters */}
+      <div className="flex items-center justify-between gap-4">
+        {/* Search */}
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Search by client, description, or work type..."
+            value={filters.search || ""}
+            onChange={(e) => handleFilterChange("search", e.target.value)}
+            className="pl-10 border-gray-200 focus:border-gray-300 focus:ring-gray-200"
+          />
         </div>
 
-        {/* Mobile Card View */}
-        <div className="lg:hidden">
-          {paginatedWorks.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              No work transactions found
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {paginatedWorks.map((work) => {
+        <div className="flex items-center gap-3">
+          {/* Filter Dropdown */}
+          <Select
+            value={`${filters.workType || "all"}-${filters.paymentStatus || "all"}-${filters.clientId || "all"}`}
+            onValueChange={(value) => {
+              const [workType, paymentStatus, clientId] = value.split("-");
+              handleFilterChange(
+                "workType",
+                workType === "all" ? undefined : (workType as WorkType),
+              );
+              handleFilterChange(
+                "paymentStatus",
+                paymentStatus === "all"
+                  ? undefined
+                  : (paymentStatus as PaymentStatus),
+              );
+              handleFilterChange(
+                "clientId",
+                clientId === "all" ? undefined : (clientId as Id<"clients">),
+              );
+            }}
+          >
+            <SelectTrigger className="w-40 border-gray-200">
+              <Filter className="h-4 w-4 mr-2 text-gray-500" />
+              <SelectValue placeholder="Filter" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all-all-all">All Transactions</SelectItem>
+
+              {/* Payment Status Filters */}
+              <div className="px-2 py-1.5 text-xs font-medium text-gray-500 border-b">
+                Payment Status
+              </div>
+              <SelectItem value="all-paid-all">Paid</SelectItem>
+              <SelectItem value="all-partial-all">Partial</SelectItem>
+              <SelectItem value="all-unpaid-all">Unpaid</SelectItem>
+
+              {/* Work Type Filters */}
+              <div className="px-2 py-1.5 text-xs font-medium text-gray-500 border-b border-t mt-1">
+                Work Type
+              </div>
+              <SelectItem value="online-work-all-all">Online Work</SelectItem>
+              <SelectItem value="health-insurance-all-all">
+                Health Insurance
+              </SelectItem>
+              <SelectItem value="life-insurance-all-all">
+                Life Insurance
+              </SelectItem>
+              <SelectItem value="income-tax-all-all">Income Tax</SelectItem>
+              <SelectItem value="mutual-funds-all-all">Mutual Funds</SelectItem>
+              <SelectItem value="others-all-all">Others</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Sort Dropdown */}
+          <Select
+            value={`${sortField}-${sortDirection}`}
+            onValueChange={(value) => {
+              const [field, direction] = value.split("-") as [
+                SortField,
+                SortDirection,
+              ];
+              setSortField(field);
+              setSortDirection(direction);
+              setCurrentPage(0);
+            }}
+          >
+            <SelectTrigger className="w-40 border-gray-200">
+              <ChevronUp className="h-4 w-4 mr-2 text-gray-500" />
+              <SelectValue placeholder="Sort" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="transactionDate-desc">Newest First</SelectItem>
+              <SelectItem value="transactionDate-asc">Oldest First</SelectItem>
+              <SelectItem value="totalPrice-desc">Amount High-Low</SelectItem>
+              <SelectItem value="totalPrice-asc">Amount Low-High</SelectItem>
+              <SelectItem value="clientName-asc">Client A-Z</SelectItem>
+              <SelectItem value="clientName-desc">Client Z-A</SelectItem>
+              <SelectItem value="workTypes-asc">Work Type A-Z</SelectItem>
+              <SelectItem value="paymentStatus-asc">Status A-Z</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Clear Filters - only show if filters are active */}
+          {(filters.search ||
+            filters.workType ||
+            filters.paymentStatus ||
+            filters.clientId ||
+            filters.dateFrom ||
+            filters.dateTo ||
+            filters.amountMin ||
+            filters.amountMax ||
+            sortField !== "transactionDate" ||
+            sortDirection !== "desc") && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearFilters}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              Clear
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Results */}
+      {!works || works.length === 0 ? (
+        <div className="bg-white border border-gray-200 rounded-lg p-12 text-center">
+          <div className="flex items-center justify-center w-16 h-16 bg-gray-100 rounded-lg mx-auto mb-4">
+            <FileText className="h-8 w-8 text-gray-400" />
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            No work transactions found
+          </h3>
+          <p className="text-gray-500 mb-4">
+            Try adjusting your filters or add a new work transaction
+          </p>
+          {onAddWork && (
+            <Button
+              onClick={onAddWork}
+              className="bg-gray-900 hover:bg-gray-800"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add your first work
+            </Button>
+          )}
+        </div>
+      ) : (
+        <>
+          {/* Desktop Table View */}
+          <div className="hidden lg:block bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-gray-200 bg-gray-50/50">
+                  {showSelection && (
+                    <TableHead className="w-12">
+                      <input
+                        type="checkbox"
+                        checked={
+                          paginatedWorks.length > 0 &&
+                          paginatedWorks.every((work) =>
+                            selectedWorks.includes(work._id),
+                          )
+                        }
+                        onChange={(e) => handleSelectAll(e.target.checked)}
+                        className="rounded border-gray-300"
+                      />
+                    </TableHead>
+                  )}
+                  <TableHead
+                    className="cursor-pointer hover:bg-gray-100 transition-colors font-medium"
+                    onClick={() => handleSort("transactionDate")}
+                  >
+                    Date {getSortIcon("transactionDate")}
+                  </TableHead>
+                  <TableHead
+                    className="cursor-pointer hover:bg-gray-100 transition-colors font-medium"
+                    onClick={() => handleSort("clientName")}
+                  >
+                    Client {getSortIcon("clientName")}
+                  </TableHead>
+                  <TableHead
+                    className="cursor-pointer hover:bg-gray-100 transition-colors font-medium"
+                    onClick={() => handleSort("workTypes")}
+                  >
+                    Work Type {getSortIcon("workTypes")}
+                  </TableHead>
+                  <TableHead className="font-medium">Description</TableHead>
+                  <TableHead
+                    className="cursor-pointer hover:bg-gray-100 transition-colors font-medium text-right"
+                    onClick={() => handleSort("totalPrice")}
+                  >
+                    Total {getSortIcon("totalPrice")}
+                  </TableHead>
+                  <TableHead
+                    className="cursor-pointer hover:bg-gray-100 transition-colors font-medium text-right"
+                    onClick={() => handleSort("paidAmount")}
+                  >
+                    Paid {getSortIcon("paidAmount")}
+                  </TableHead>
+                  <TableHead className="font-medium text-right">
+                    Balance
+                  </TableHead>
+                  <TableHead
+                    className="cursor-pointer hover:bg-gray-100 transition-colors font-medium"
+                    onClick={() => handleSort("paymentStatus")}
+                  >
+                    Status {getSortIcon("paymentStatus")}
+                  </TableHead>
+                  <TableHead className="font-medium w-24">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedWorks.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={showSelection ? 10 : 9}
+                      className="text-center py-8 text-gray-500"
+                    >
+                      No work transactions found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  paginatedWorks.map((work) => {
+                    const client = clientMap[work.clientId];
+                    const balance = work.totalPrice - work.paidAmount;
+
+                    return (
+                      <TableRow
+                        key={work._id}
+                        className="border-gray-200 hover:bg-gray-50 transition-colors"
+                      >
+                        {showSelection && (
+                          <TableCell className="py-4">
+                            <input
+                              type="checkbox"
+                              checked={selectedWorks.includes(work._id)}
+                              onChange={(e) =>
+                                handleWorkSelection(work._id, e.target.checked)
+                              }
+                              className="rounded border-gray-300"
+                            />
+                          </TableCell>
+                        )}
+                        <TableCell className="py-4">
+                          <div className="text-sm text-gray-900">
+                            {work.transactionDate}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center justify-center w-8 h-8 bg-gray-100 rounded-lg text-xs font-medium text-gray-600">
+                              {client?.name?.charAt(0).toUpperCase() || "?"}
+                            </div>
+                            <div className="font-medium text-gray-900">
+                              {client?.name || "Unknown Client"}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4">
+                          <div className="text-sm text-gray-900">
+                            <div className="flex flex-wrap gap-1">
+                              {work.workTypes.map((workType) => (
+                                <Badge
+                                  key={workType}
+                                  variant="outline"
+                                  className="text-xs"
+                                >
+                                  {getWorkTypeLabel(workType)}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4">
+                          <div className="max-w-xs truncate text-sm text-gray-900">
+                            {work.description}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4 text-right">
+                          <div className="font-medium text-gray-900">
+                            {formatCurrency(work.totalPrice)}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4 text-right">
+                          <div className="font-medium text-gray-900">
+                            {formatCurrency(work.paidAmount)}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4 text-right">
+                          <div
+                            className={`font-medium ${balance > 0 ? "text-red-600" : balance < 0 ? "text-green-600" : "text-gray-600"}`}
+                          >
+                            {formatCurrency(balance)}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4">
+                          <PaymentStatusBadge status={work.paymentStatus} />
+                        </TableCell>
+                        <TableCell className="py-4">
+                          <div className="flex items-center gap-1">
+                            {onEditWork && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => onEditWork(work)}
+                                className="h-8 w-8 p-0 hover:bg-gray-100"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {onDeleteWork && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => onDeleteWork(work)}
+                                className="h-8 w-8 p-0 hover:bg-gray-100"
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="lg:hidden space-y-3">
+            {paginatedWorks.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                No work transactions found
+              </div>
+            ) : (
+              paginatedWorks.map((work) => {
                 const client = clientMap[work.clientId];
                 const balance = work.totalPrice - work.paidAmount;
 
                 return (
-                  <Card key={work._id} className="p-4">
+                  <div
+                    key={work._id}
+                    className="bg-white border border-gray-200 rounded-lg p-4"
+                  >
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
@@ -550,15 +671,24 @@ export default function WorkList({
                             <input
                               type="checkbox"
                               checked={selectedWorks.includes(work._id)}
-                              onChange={(e) => handleWorkSelection(work._id, e.target.checked)}
+                              onChange={(e) =>
+                                handleWorkSelection(work._id, e.target.checked)
+                              }
                               className="rounded border-gray-300"
                             />
                           )}
-                          <h3 className="font-medium text-lg">
-                            {client?.name || "Unknown Client"}
-                          </h3>
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center justify-center w-8 h-8 bg-gray-100 rounded-lg text-xs font-medium text-gray-600">
+                              {client?.name?.charAt(0).toUpperCase() || "?"}
+                            </div>
+                            <h3 className="font-medium text-gray-900">
+                              {client?.name || "Unknown Client"}
+                            </h3>
+                          </div>
                         </div>
-                        <p className="text-sm text-gray-500">{work.transactionDate}</p>
+                        <p className="text-sm text-gray-500">
+                          {work.transactionDate}
+                        </p>
                       </div>
                       <PaymentStatusBadge status={work.paymentStatus} />
                     </div>
@@ -566,39 +696,56 @@ export default function WorkList({
                     <div className="space-y-2 mb-4">
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-500">Work Type:</span>
-                        <span className="font-medium">{getWorkTypeLabel(work.workType)}</span>
+                        <div className="flex flex-wrap gap-1">
+                          {work.workTypes.map((workType) => (
+                            <Badge
+                              key={workType}
+                              variant="outline"
+                              className="text-xs"
+                            >
+                              {getWorkTypeLabel(workType)}
+                            </Badge>
+                          ))}
+                        </div>
                       </div>
                       <div className="text-sm">
                         <span className="text-gray-500">Description:</span>
-                        <p className="mt-1">{work.description}</p>
+                        <p className="mt-1 text-gray-900">{work.description}</p>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-3 gap-4 text-sm mb-4">
                       <div>
                         <p className="text-gray-500">Total</p>
-                        <p className="font-medium">{formatCurrency(work.totalPrice)}</p>
+                        <p className="font-medium text-gray-900">
+                          {formatCurrency(work.totalPrice)}
+                        </p>
                       </div>
                       <div>
                         <p className="text-gray-500">Paid</p>
-                        <p className="font-medium">{formatCurrency(work.paidAmount)}</p>
+                        <p className="font-medium text-gray-900">
+                          {formatCurrency(work.paidAmount)}
+                        </p>
                       </div>
                       <div>
                         <p className="text-gray-500">Balance</p>
-                        <p className={`font-medium ${balance > 0 ? "text-red-600" : balance < 0 ? "text-green-600" : ""}`}>
-                          {formatCurrency(Math.abs(balance))}
+                        <p
+                          className={`font-medium ${balance > 0 ? "text-red-600" : balance < 0 ? "text-green-600" : "text-gray-600"}`}
+                        >
+                          {formatCurrency(balance)}
                         </p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 pt-3 border-t">
+                    <div className="flex items-center gap-2 pt-3 border-t border-gray-200">
                       {onEditWork && (
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => onEditWork(work)}
-                          className="flex-1"
+                          className="flex-1 border-gray-200"
                         >
+                          <Edit className="h-4 w-4 mr-2" />
                           Edit
                         </Button>
                       )}
@@ -607,51 +754,92 @@ export default function WorkList({
                           variant="outline"
                           size="sm"
                           onClick={() => onDeleteWork(work)}
-                          className="flex-1"
+                          className="flex-1 border-gray-200"
                         >
+                          <MoreHorizontal className="h-4 w-4 mr-2" />
                           Delete
                         </Button>
                       )}
                     </div>
-                  </Card>
+                  </div>
                 );
-              })}
-            </div>
-          )}
-        </div>
+              })
+            )}
+          </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex flex-col sm:flex-row items-center justify-between mt-4 gap-4">
-            <div className="text-sm text-gray-500 text-center sm:text-left">
-              Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
-              {Math.min(currentPage * itemsPerPage, filteredAndSortedWorks.length)} of{" "}
-              {filteredAndSortedWorks.length} results
+          {/* Pagination */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">Rows per page</span>
+                <Select
+                  value={pageSize.toString()}
+                  onValueChange={(value) =>
+                    handlePageSizeChange(parseInt(value))
+                  }
+                >
+                  <SelectTrigger className="w-16 h-8 border-gray-200">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5">5</SelectItem>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="text-sm text-gray-500">
+                <span className="font-medium">
+                  {currentPage * pageSize + 1}-
+                  {Math.min((currentPage + 1) * pageSize, total)}
+                </span>{" "}
+                of <span className="font-medium">{total}</span>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
+
+            <div className="flex items-center gap-1">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(0)}
+                disabled={currentPage === 0}
+                className="h-8 w-8 p-0 border-gray-200"
               >
-                Previous
+                <ChevronsLeft className="h-4 w-4" />
               </Button>
-              <span className="text-sm">
-                Page {currentPage} of {totalPages}
-              </span>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(Math.max(0, currentPage - 1))}
+                disabled={currentPage === 0}
+                className="h-8 w-8 p-0 border-gray-200"
               >
-                Next
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(currentPage + 1)}
+                disabled={currentPage === totalPages - 1}
+                className="h-8 w-8 p-0 border-gray-200"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(totalPages - 1)}
+                disabled={currentPage === totalPages - 1}
+                className="h-8 w-8 p-0 border-gray-200"
+              >
+                <ChevronsRight className="h-4 w-4" />
               </Button>
             </div>
           </div>
-        )}
-      </CardContent>
-    </Card>
+        </>
+      )}
+    </div>
   );
 }

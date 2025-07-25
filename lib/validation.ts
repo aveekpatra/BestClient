@@ -101,10 +101,10 @@ export function validateAmount(amount: number): boolean {
 }
 
 /**
- * Validates that paid amount doesn't exceed total price
+ * Validates that paid amount is non-negative
  */
 export function validatePaymentAmount(totalPrice: number, paidAmount: number): boolean {
-  return paidAmount >= 0 && paidAmount <= totalPrice;
+  return paidAmount >= 0; // Allow overpayments
 }
 
 /**
@@ -189,7 +189,7 @@ export function validateWorkData(data: {
   }
 
   if (!validatePaymentAmount(data.totalPrice, data.paidAmount)) {
-    errors.paidAmount = "Paid amount cannot exceed total price";
+    errors.paidAmount = "Paid amount must be non-negative";
   }
 
   if (!validateDescription(data.description)) {

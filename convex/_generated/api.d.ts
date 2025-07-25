@@ -18,6 +18,8 @@ import type * as auth from "../auth.js";
 import type * as balanceHistory from "../balanceHistory.js";
 import type * as clients from "../clients.js";
 import type * as http from "../http.js";
+import type * as migrations from "../migrations.js";
+import type * as todos from "../todos.js";
 import type * as works from "../works.js";
 
 /**
@@ -34,6 +36,8 @@ declare const fullApi: ApiFromModules<{
   balanceHistory: typeof balanceHistory;
   clients: typeof clients;
   http: typeof http;
+  migrations: typeof migrations;
+  todos: typeof todos;
   works: typeof works;
 }>;
 export declare const api: FilterApi<

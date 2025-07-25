@@ -2,15 +2,20 @@
 
 import { useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { formatCurrency } from "../lib/utils";
-import { 
-  Users, 
-  Briefcase, 
-  TrendingUp, 
+import {
+  Users,
+  Briefcase,
+  TrendingUp,
   AlertCircle,
   DollarSign,
-  PieChart
+  PieChart,
+  CheckCircle,
+  Clock,
+  XCircle,
+  Wallet,
+  CreditCard,
+  Scale,
 } from "lucide-react";
 
 interface StatisticsOverviewProps {
@@ -18,7 +23,10 @@ interface StatisticsOverviewProps {
   dateTo?: string;
 }
 
-export default function StatisticsOverview({ dateFrom, dateTo }: StatisticsOverviewProps) {
+export default function StatisticsOverview({
+  dateFrom,
+  dateTo,
+}: StatisticsOverviewProps) {
   const overviewStats = useQuery(api.analytics.getOverviewStats, {
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
@@ -26,17 +34,28 @@ export default function StatisticsOverview({ dateFrom, dateTo }: StatisticsOverv
 
   if (!overviewStats) {
     return (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {[...Array(6)].map((_, i) => (
-          <Card key={i}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Loading...</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-8 bg-muted animate-pulse rounded"></div>
-            </CardContent>
-          </Card>
-        ))}
+      <div className="space-y-8">
+        {/* Overview Skeleton */}
+        <div>
+          <div className="h-7 w-40 bg-gray-200 rounded animate-pulse mb-3"></div>
+          <div className="h-5 w-64 bg-gray-100 rounded animate-pulse"></div>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {[...Array(6)].map((_, i) => (
+            <div
+              key={i}
+              className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div>
+                <div className="h-10 w-10 bg-gray-200 rounded-xl animate-pulse"></div>
+              </div>
+              <div className="h-8 w-20 bg-gray-200 rounded animate-pulse mb-2"></div>
+              <div className="h-3 w-32 bg-gray-100 rounded animate-pulse"></div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -46,135 +65,238 @@ export default function StatisticsOverview({ dateFrom, dateTo }: StatisticsOverv
       title: "Total Clients",
       value: overviewStats.totalClients.toString(),
       icon: Users,
-      description: "Active clients in system",
+      description: "Active clients",
+      color: "blue",
     },
     {
-      title: "Total Works",
+      title: "Total Projects",
       value: overviewStats.totalWorks.toString(),
       icon: Briefcase,
-      description: "Work transactions",
+      description: "Work completed",
+      color: "purple",
     },
     {
-      title: "Total Income",
+      title: "Revenue Earned",
       value: formatCurrency(overviewStats.totalIncome),
       icon: TrendingUp,
-      description: "Amount received",
+      description: "Money received",
+      color: "green",
       positive: true,
     },
     {
-      title: "Total Due",
+      title: "Amount Due",
       value: formatCurrency(overviewStats.totalDue),
       icon: AlertCircle,
-      description: "Outstanding amount",
+      description: "Pending payments",
+      color: "red",
       negative: overviewStats.totalDue > 0,
     },
     {
-      title: "Total Value",
+      title: "Total Business Value",
       value: formatCurrency(overviewStats.totalValue),
       icon: DollarSign,
-      description: "Total business value",
+      description: "Overall worth",
+      color: "indigo",
     },
     {
       title: "Collection Rate",
       value: `${overviewStats.totalValue > 0 ? ((overviewStats.totalIncome / overviewStats.totalValue) * 100).toFixed(1) : 0}%`,
       icon: PieChart,
-      description: "Payment collection efficiency",
-      positive: overviewStats.totalValue > 0 && (overviewStats.totalIncome / overviewStats.totalValue) > 0.8,
+      description: "Payment efficiency",
+      color:
+        overviewStats.totalValue > 0 &&
+        overviewStats.totalIncome / overviewStats.totalValue > 0.8
+          ? "green"
+          : "yellow",
+      positive:
+        overviewStats.totalValue > 0 &&
+        overviewStats.totalIncome / overviewStats.totalValue > 0.8,
     },
   ];
 
+  const getColorClasses = (color: string) => {
+    const colors = {
+      blue: { bg: "bg-blue-50", text: "text-blue-600", icon: "text-blue-600" },
+      purple: {
+        bg: "bg-purple-50",
+        text: "text-purple-600",
+        icon: "text-purple-600",
+      },
+      green: {
+        bg: "bg-green-50",
+        text: "text-green-600",
+        icon: "text-green-600",
+      },
+      red: { bg: "bg-red-50", text: "text-red-600", icon: "text-red-600" },
+      indigo: {
+        bg: "bg-indigo-50",
+        text: "text-indigo-600",
+        icon: "text-indigo-600",
+      },
+      yellow: {
+        bg: "bg-yellow-50",
+        text: "text-yellow-600",
+        icon: "text-yellow-600",
+      },
+    };
+    return colors[color as keyof typeof colors] || colors.blue;
+  };
+
   return (
-    <div className="space-y-4">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Overview</h2>
-        <p className="text-muted-foreground">Key business metrics at a glance</p>
+    <div className="space-y-8">
+      {/* Overview Header */}
+      <div className="text-center">
+        <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+          Business Dashboard
+        </h2>
+        <p className="text-gray-600">Your business performance at a glance</p>
       </div>
-      
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+
+      {/* Stats Grid */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {stats.map((stat, index) => {
           const Icon = stat.icon;
+          const colors = getColorClasses(stat.color);
           return (
-            <Card key={index}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
-                <Icon className={`h-4 w-4 ${
-                  stat.positive ? 'text-green-600' : 
-                  stat.negative ? 'text-red-600' : 
-                  'text-muted-foreground'
-                }`} />
-              </CardHeader>
-              <CardContent>
-                <div className={`text-2xl font-bold ${
-                  stat.positive ? 'text-green-600' : 
-                  stat.negative ? 'text-red-600' : 
-                  ''
-                }`}>
-                  {stat.value}
+            <div
+              key={index}
+              className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow duration-200"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-medium text-gray-700">
+                  {stat.title}
+                </h3>
+                <div
+                  className={`flex items-center justify-center w-10 h-10 rounded-xl ${colors.bg}`}
+                >
+                  <Icon className={`h-5 w-5 ${colors.icon}`} />
                 </div>
-                <p className="text-xs text-muted-foreground">{stat.description}</p>
-              </CardContent>
-            </Card>
+              </div>
+              <div className={`text-2xl font-bold mb-1 ${colors.text}`}>
+                {stat.value}
+              </div>
+              <p className="text-sm text-gray-500">{stat.description}</p>
+            </div>
           );
         })}
       </div>
 
-      {/* Payment Status Breakdown */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Payment Status Breakdown</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="text-center">
+      {/* Breakdown Sections - Side by Side */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Payment Status Breakdown */}
+        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+          <div className="text-center mb-6">
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              Payment Status
+            </h3>
+            <p className="text-gray-600">How your projects are performing</p>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-4 bg-green-50 rounded-xl">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-10 h-10 bg-green-100 rounded-full">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Fully Paid</p>
+                  <p className="text-sm text-gray-600">Complete payments</p>
+                </div>
+              </div>
               <div className="text-2xl font-bold text-green-600">
                 {overviewStats.paymentBreakdown.paid}
               </div>
-              <p className="text-sm text-muted-foreground">Paid Works</p>
             </div>
-            <div className="text-center">
+
+            <div className="flex items-center justify-between p-4 bg-yellow-50 rounded-xl">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-10 h-10 bg-yellow-100 rounded-full">
+                  <Clock className="h-5 w-5 text-yellow-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Partial Payment</p>
+                  <p className="text-sm text-gray-600">In progress</p>
+                </div>
+              </div>
               <div className="text-2xl font-bold text-yellow-600">
                 {overviewStats.paymentBreakdown.partial}
               </div>
-              <p className="text-sm text-muted-foreground">Partial Payments</p>
             </div>
-            <div className="text-center">
+
+            <div className="flex items-center justify-between p-4 bg-red-50 rounded-xl">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-10 h-10 bg-red-100 rounded-full">
+                  <XCircle className="h-5 w-5 text-red-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Unpaid</p>
+                  <p className="text-sm text-gray-600">Needs attention</p>
+                </div>
+              </div>
               <div className="text-2xl font-bold text-red-600">
                 {overviewStats.paymentBreakdown.unpaid}
               </div>
-              <p className="text-sm text-muted-foreground">Unpaid Works</p>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Client Balance Breakdown */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Client Balance Distribution</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="text-center">
+        {/* Client Balance Distribution */}
+        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+          <div className="text-center mb-6">
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              Client Balances
+            </h3>
+            <p className="text-gray-600">Money flow with your clients</p>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-4 bg-green-50 rounded-xl">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-10 h-10 bg-green-100 rounded-full">
+                  <CreditCard className="h-5 w-5 text-green-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">They Owe You</p>
+                  <p className="text-sm text-gray-600">Money coming in</p>
+                </div>
+              </div>
               <div className="text-2xl font-bold text-green-600">
                 {overviewStats.clientBalanceBreakdown.positive}
               </div>
-              <p className="text-sm text-muted-foreground">Clients Owe You</p>
             </div>
-            <div className="text-center">
+
+            <div className="flex items-center justify-between p-4 bg-red-50 rounded-xl">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-10 h-10 bg-red-100 rounded-full">
+                  <Wallet className="h-5 w-5 text-red-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">You Owe Them</p>
+                  <p className="text-sm text-gray-600">Money going out</p>
+                </div>
+              </div>
               <div className="text-2xl font-bold text-red-600">
                 {overviewStats.clientBalanceBreakdown.negative}
               </div>
-              <p className="text-sm text-muted-foreground">You Owe Clients</p>
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-muted-foreground">
+
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-10 h-10 bg-gray-100 rounded-full">
+                  <Scale className="h-5 w-5 text-gray-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">All Balanced</p>
+                  <p className="text-sm text-gray-600">Nothing owed</p>
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-gray-600">
                 {overviewStats.clientBalanceBreakdown.zero}
               </div>
-              <p className="text-sm text-muted-foreground">Balanced Clients</p>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

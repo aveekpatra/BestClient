@@ -6,12 +6,23 @@ import { api } from "../convex/_generated/api";
 import { Id } from "../convex/_generated/dataModel";
 import { Work, WorkType, WorkFormData } from "../lib/types";
 import { validateWorkData } from "../lib/validation";
-import { formatCurrency, rupeesToPaise, paiseToRupees, getCurrentDate } from "../lib/utils";
+import {
+  formatCurrency,
+  rupeesToPaise,
+  paiseToRupees,
+  getCurrentDate,
+} from "../lib/utils";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Alert, AlertDescription } from "./ui/alert";
 import { Loader2, Calculator } from "lucide-react";
@@ -23,39 +34,52 @@ interface WorkFormProps {
   isSubmitting?: boolean;
 }
 
-export default function WorkForm({ work, onSubmit, onCancel, isSubmitting = false }: WorkFormProps) {
+export default function WorkForm({
+  work,
+  onSubmit,
+  onCancel,
+  isSubmitting = false,
+}: WorkFormProps) {
   const [formData, setFormData] = useState<WorkFormData>({
     clientId: work?.clientId || ("" as Id<"clients">),
     transactionDate: work?.transactionDate || getCurrentDate(),
     totalPrice: work?.totalPrice || 0,
     paidAmount: work?.paidAmount || 0,
-    workType: work?.workType || "online-work",
+    workTypes: work?.workTypes || ["online-work"],
     description: work?.description || "",
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [totalPriceRupees, setTotalPriceRupees] = useState(
-    work ? paiseToRupees(work.totalPrice).toString() : ""
+    work ? paiseToRupees(work.totalPrice).toString() : "",
   );
   const [paidAmountRupees, setPaidAmountRupees] = useState(
-    work ? paiseToRupees(work.paidAmount).toString() : ""
+    work ? paiseToRupees(work.paidAmount).toString() : "",
   );
 
   // Fetch clients for dropdown
   const clientsData = useQuery(api.clients.getClients, {});
 
-  // Calculate balance and payment status
-  const balance = formData.totalPrice - formData.paidAmount;
-  const paymentStatus = 
-    formData.paidAmount >= formData.totalPrice ? "paid" :
-    formData.paidAmount > 0 ? "partial" : "unpaid";
+  // Calculate work balance and payment status
+  const workBalance = formData.totalPrice - formData.paidAmount;
+  const overpayment = formData.paidAmount - formData.totalPrice;
+  const paymentStatus =
+    formData.paidAmount >= formData.totalPrice
+      ? "paid"
+      : formData.paidAmount > 0
+        ? "partial"
+        : "unpaid";
 
   // Update form data when amounts change
   useEffect(() => {
-    const totalPaise = totalPriceRupees ? rupeesToPaise(parseFloat(totalPriceRupees) || 0) : 0;
-    const paidPaise = paidAmountRupees ? rupeesToPaise(parseFloat(paidAmountRupees) || 0) : 0;
-    
-    setFormData(prev => ({
+    const totalPaise = totalPriceRupees
+      ? rupeesToPaise(parseFloat(totalPriceRupees) || 0)
+      : 0;
+    const paidPaise = paidAmountRupees
+      ? rupeesToPaise(parseFloat(paidAmountRupees) || 0)
+      : 0;
+
+    setFormData((prev) => ({
       ...prev,
       totalPrice: totalPaise,
       paidAmount: paidPaise,
@@ -64,7 +88,7 @@ export default function WorkForm({ work, onSubmit, onCancel, isSubmitting = fals
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validate form data
     const validation = validateWorkData({
       transactionDate: formData.transactionDate,
@@ -75,9 +99,13 @@ export default function WorkForm({ work, onSubmit, onCancel, isSubmitting = fals
 
     // Additional validations
     const newErrors: Record<string, string> = { ...validation.errors };
-    
+
     if (!formData.clientId) {
       newErrors.clientId = "Please select a client";
+    }
+
+    if (!formData.workTypes || formData.workTypes.length === 0) {
+      newErrors.workTypes = "Please select at least one work type";
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -86,7 +114,7 @@ export default function WorkForm({ work, onSubmit, onCancel, isSubmitting = fals
     }
 
     setErrors({});
-    
+
     try {
       await onSubmit(formData);
     } catch (error) {
@@ -95,15 +123,21 @@ export default function WorkForm({ work, onSubmit, onCancel, isSubmitting = fals
     }
   };
 
-  const handleInputChange = (field: keyof WorkFormData, value: string | WorkType | Id<"clients">) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const handleInputChange = (
+    field: keyof WorkFormData,
+    value: string | WorkType | Id<"clients">,
+  ) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
     // Clear error when user starts typing
     if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: "" }));
+      setErrors((prev) => ({ ...prev, [field]: "" }));
     }
   };
 
-  const handleAmountChange = (field: "totalPrice" | "paidAmount", value: string) => {
+  const handleAmountChange = (
+    field: "totalPrice" | "paidAmount",
+    value: string,
+  ) => {
     // Only allow valid number input
     if (value === "" || /^\d*\.?\d*$/.test(value)) {
       if (field === "totalPrice") {
@@ -111,10 +145,10 @@ export default function WorkForm({ work, onSubmit, onCancel, isSubmitting = fals
       } else {
         setPaidAmountRupees(value);
       }
-      
+
       // Clear error when user starts typing
       if (errors[field]) {
-        setErrors(prev => ({ ...prev, [field]: "" }));
+        setErrors((prev) => ({ ...prev, [field]: "" }));
       }
     }
   };
@@ -135,7 +169,9 @@ export default function WorkForm({ work, onSubmit, onCancel, isSubmitting = fals
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{work ? "Edit Work Transaction" : "Add New Work Transaction"}</CardTitle>
+        <CardTitle>
+          {work ? "Edit Work Transaction" : "Add New Work Transaction"}
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -150,9 +186,13 @@ export default function WorkForm({ work, onSubmit, onCancel, isSubmitting = fals
             <Label htmlFor="clientId">Client *</Label>
             <Select
               value={formData.clientId}
-              onValueChange={(value) => handleInputChange("clientId", value as Id<"clients">)}
+              onValueChange={(value) =>
+                handleInputChange("clientId", value as Id<"clients">)
+              }
             >
-              <SelectTrigger className={errors.clientId ? "border-red-500" : ""}>
+              <SelectTrigger
+                className={errors.clientId ? "border-red-500" : ""}
+              >
                 <SelectValue placeholder="Select a client" />
               </SelectTrigger>
               <SelectContent>
@@ -174,10 +214,10 @@ export default function WorkForm({ work, onSubmit, onCancel, isSubmitting = fals
             <Input
               id="transactionDate"
               type="date"
-              value={formData.transactionDate.split('/').reverse().join('-')} // Convert DD/MM/YYYY to YYYY-MM-DD for input
+              value={formData.transactionDate.split("/").reverse().join("-")} // Convert DD/MM/YYYY to YYYY-MM-DD for input
               onChange={(e) => {
                 // Convert YYYY-MM-DD back to DD/MM/YYYY
-                const [year, month, day] = e.target.value.split('-');
+                const [year, month, day] = e.target.value.split("-");
                 const ddmmyyyy = `${day}/${month}/${year}`;
                 handleInputChange("transactionDate", ddmmyyyy);
               }}
@@ -188,25 +228,64 @@ export default function WorkForm({ work, onSubmit, onCancel, isSubmitting = fals
             )}
           </div>
 
-          {/* Work Type */}
+          {/* Work Types */}
           <div className="space-y-2">
-            <Label htmlFor="workType">Work Type *</Label>
-            <Select
-              value={formData.workType}
-              onValueChange={(value) => handleInputChange("workType", value as WorkType)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="online-work">Online Work</SelectItem>
-                <SelectItem value="health-insurance">Health Insurance</SelectItem>
-                <SelectItem value="life-insurance">Life Insurance</SelectItem>
-                <SelectItem value="income-tax">Income Tax</SelectItem>
-                <SelectItem value="mutual-funds">Mutual Funds</SelectItem>
-                <SelectItem value="others">Others</SelectItem>
-              </SelectContent>
-            </Select>
+            <Label htmlFor="workTypes">Work Types *</Label>
+            <div className="grid grid-cols-2 gap-3 p-3 border border-gray-200 rounded-lg">
+              {[
+                { value: "online-work", label: "Online Work" },
+                { value: "health-insurance", label: "Health Insurance" },
+                { value: "life-insurance", label: "Life Insurance" },
+                { value: "income-tax", label: "Income Tax" },
+                { value: "p-tax", label: "P-Tax" },
+                { value: "mutual-funds", label: "Mutual Funds" },
+                { value: "others", label: "Others" },
+              ].map((workType) => (
+                <label
+                  key={workType.value}
+                  className="flex items-center space-x-2 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={
+                      formData.workTypes?.includes(
+                        workType.value as WorkType,
+                      ) || false
+                    }
+                    onChange={(e) => {
+                      const currentValues = formData.workTypes || [];
+                      if (e.target.checked) {
+                        setFormData((prev) => ({
+                          ...prev,
+                          workTypes: [
+                            ...currentValues,
+                            workType.value as WorkType,
+                          ],
+                        }));
+                      } else {
+                        setFormData((prev) => ({
+                          ...prev,
+                          workTypes: currentValues.filter(
+                            (v) => v !== workType.value,
+                          ),
+                        }));
+                      }
+                      // Clear error when user makes selection
+                      if (errors.workTypes) {
+                        setErrors((prev) => ({ ...prev, workTypes: "" }));
+                      }
+                    }}
+                    className="rounded border-gray-300 text-gray-900 focus:ring-gray-200"
+                  />
+                  <span className="text-sm text-gray-700">
+                    {workType.label}
+                  </span>
+                </label>
+              ))}
+            </div>
+            {errors.workTypes && (
+              <p className="text-sm text-red-500">{errors.workTypes}</p>
+            )}
           </div>
 
           {/* Amount Fields */}
@@ -218,7 +297,9 @@ export default function WorkForm({ work, onSubmit, onCancel, isSubmitting = fals
                 type="text"
                 placeholder="0.00"
                 value={totalPriceRupees}
-                onChange={(e) => handleAmountChange("totalPrice", e.target.value)}
+                onChange={(e) =>
+                  handleAmountChange("totalPrice", e.target.value)
+                }
                 className={errors.totalPrice ? "border-red-500" : ""}
               />
               {errors.totalPrice && (
@@ -233,7 +314,9 @@ export default function WorkForm({ work, onSubmit, onCancel, isSubmitting = fals
                 type="text"
                 placeholder="0.00"
                 value={paidAmountRupees}
-                onChange={(e) => handleAmountChange("paidAmount", e.target.value)}
+                onChange={(e) =>
+                  handleAmountChange("paidAmount", e.target.value)
+                }
                 className={errors.paidAmount ? "border-red-500" : ""}
               />
               {errors.paidAmount && (
@@ -247,36 +330,63 @@ export default function WorkForm({ work, onSubmit, onCancel, isSubmitting = fals
             <div className="p-4 bg-gray-50 rounded-lg">
               <div className="flex items-center gap-2 mb-2">
                 <Calculator className="h-4 w-4" />
-                <span className="font-medium">Calculation Summary</span>
+                <span className="font-medium">Payment Summary</span>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
                 <div>
-                  <span className="text-gray-600">Total Price:</span>
-                  <div className="font-medium">{formatCurrency(formData.totalPrice)}</div>
+                  <span className="text-gray-600">Work Amount:</span>
+                  <div className="font-medium">
+                    {formatCurrency(formData.totalPrice)}
+                  </div>
                 </div>
                 <div>
-                  <span className="text-gray-600">Paid Amount:</span>
-                  <div className="font-medium">{formatCurrency(formData.paidAmount)}</div>
+                  <span className="text-gray-600">Payment:</span>
+                  <div className="font-medium">
+                    {formatCurrency(formData.paidAmount)}
+                  </div>
                 </div>
                 <div>
-                  <span className="text-gray-600">Balance:</span>
-                  <div className={`font-medium ${balance > 0 ? "text-red-600" : balance < 0 ? "text-green-600" : ""}`}>
-                    {formatCurrency(Math.abs(balance))}
-                    {balance > 0 && " (Due)"}
-                    {balance < 0 && " (Overpaid)"}
+                  <span className="text-gray-600">
+                    {overpayment > 0 ? "Overpayment:" : "Remaining:"}
+                  </span>
+                  <div
+                    className={`font-medium ${overpayment > 0 ? "text-green-600" : workBalance > 0 ? "text-red-600" : "text-gray-600"}`}
+                  >
+                    {formatCurrency(
+                      Math.abs(overpayment > 0 ? overpayment : workBalance),
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-gray-600">Status:</span>
+                  <div>
+                    <span
+                      className={`px-2 py-1 rounded text-xs font-medium ${
+                        paymentStatus === "paid"
+                          ? "bg-green-100 text-green-800"
+                          : paymentStatus === "partial"
+                            ? "bg-yellow-100 text-yellow-800"
+                            : "bg-red-100 text-red-800"
+                      }`}
+                    >
+                      {paymentStatus.charAt(0).toUpperCase() +
+                        paymentStatus.slice(1)}
+                      {overpayment > 0 && " + Overpaid"}
+                    </span>
                   </div>
                 </div>
               </div>
-              <div className="mt-2">
-                <span className="text-gray-600">Payment Status:</span>
-                <span className={`ml-2 px-2 py-1 rounded text-xs font-medium ${
-                  paymentStatus === "paid" ? "bg-green-100 text-green-800" :
-                  paymentStatus === "partial" ? "bg-yellow-100 text-yellow-800" :
-                  "bg-red-100 text-red-800"
-                }`}>
-                  {paymentStatus.charAt(0).toUpperCase() + paymentStatus.slice(1)}
-                </span>
-              </div>
+              {overpayment > 0 && (
+                <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span className="text-green-800 text-sm font-medium">
+                      Overpayment of {formatCurrency(overpayment)} will be
+                      credited to client&apos;s account
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -299,7 +409,9 @@ export default function WorkForm({ work, onSubmit, onCancel, isSubmitting = fals
           {/* Form Actions */}
           <div className="flex items-center gap-4 pt-4">
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              {isSubmitting && (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              )}
               {work ? "Update Work" : "Add Work"}
             </Button>
             <Button type="button" variant="outline" onClick={onCancel}>

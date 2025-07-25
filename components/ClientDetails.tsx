@@ -33,7 +33,7 @@ import {
   getWorkTypeLabel,
   getPaymentStatusInfo,
 } from "../lib/utils";
-import { ClientBalanceHistory } from "./ClientBalanceHistory";
+
 import {
   User,
   Phone,
@@ -68,9 +68,9 @@ export function ClientDetails({
 }: ClientDetailsProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [activeTab, setActiveTab] = useState<
-    "overview" | "history" | "balance"
-  >("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "history">(
+    "overview",
+  );
 
   const client = useQuery(api.clients.getClientById, { id: clientId });
   const clientWorks = useQuery(api.works.getWorksByClient, { clientId });
@@ -154,17 +154,27 @@ export function ClientDetails({
   const getWorkHistoryWithRunningBalance = () => {
     if (!clientWorks) return [];
 
-    // Sort works by date (oldest first) for running balance calculation
+    // Sort works by date and creation time (oldest first) for running balance calculation
     const sortedWorks = [...clientWorks].sort((a, b) => {
       const dateA = new Date(a.transactionDate.split("/").reverse().join("-"));
       const dateB = new Date(b.transactionDate.split("/").reverse().join("-"));
-      return dateA.getTime() - dateB.getTime();
+      const dateDiff = dateA.getTime() - dateB.getTime();
+
+      // If same date, sort by creation time (oldest first)
+      if (dateDiff === 0) {
+        return a.createdAt - b.createdAt;
+      }
+      return dateDiff;
     });
 
     let runningBalance = 0;
     return sortedWorks
       .map((work) => {
+        // Individual work balance: positive = debt, negative = credit
         const workBalance = work.totalPrice - work.paidAmount;
+
+        // Running balance: accumulate the balance change
+        // This matches the backend logic: balanceChange = totalPrice - paidAmount
         runningBalance += workBalance;
 
         return {
@@ -274,14 +284,11 @@ export function ClientDetails({
       <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
         {[
           { id: "overview", label: "Overview" },
-          { id: "history", label: "Work History" },
-          { id: "balance", label: "Balance History" },
+          { id: "history", label: "Transaction History" },
         ].map((tab) => (
           <button
             key={tab.id}
-            onClick={() =>
-              setActiveTab(tab.id as "overview" | "history" | "balance")
-            }
+            onClick={() => setActiveTab(tab.id as "overview" | "history")}
             className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all duration-200 ${
               activeTab === tab.id
                 ? "bg-white text-gray-900 shadow-sm"
@@ -507,7 +514,7 @@ export function ClientDetails({
               <div className="flex items-center gap-3">
                 <History className="h-5 w-5 text-gray-500" />
                 <h3 className="text-lg font-medium text-gray-900">
-                  Work History
+                  Transaction History
                 </h3>
                 {clientWorks && (
                   <Badge
@@ -682,8 +689,6 @@ export function ClientDetails({
           </div>
         </div>
       )}
-
-      {activeTab === "balance" && <ClientBalanceHistory clientId={clientId} />}
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

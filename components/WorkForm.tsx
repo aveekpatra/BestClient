@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { Id } from "../convex/_generated/dataModel";
@@ -16,16 +16,16 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./ui/select";
+
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Alert, AlertDescription } from "./ui/alert";
-import { Loader2, Calculator } from "lucide-react";
+import {
+  Loader2,
+  Calculator,
+  Check,
+  ChevronsUpDown,
+  Search,
+} from "lucide-react";
 
 interface WorkFormProps {
   work?: Work;
@@ -57,8 +57,24 @@ export default function WorkForm({
     work ? paiseToRupees(work.paidAmount).toString() : "",
   );
 
+  // Client search state
+  const [clientSearch, setClientSearch] = useState("");
+  const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
+  const clientDropdownRef = useRef<HTMLDivElement>(null);
+
   // Fetch clients for dropdown
   const clientsData = useQuery(api.clients.getClients, {});
+
+  // Filter clients based on search
+  const filteredClients =
+    clientsData?.clients?.filter((client) =>
+      client.name.toLowerCase().includes(clientSearch.toLowerCase()),
+    ) || [];
+
+  // Get selected client name for display
+  const selectedClient = clientsData?.clients?.find(
+    (client) => client._id === formData.clientId,
+  );
 
   // Calculate work balance and payment status
   const workBalance = formData.totalPrice - formData.paidAmount;
@@ -85,6 +101,23 @@ export default function WorkForm({
       paidAmount: paidPaise,
     }));
   }, [totalPriceRupees, paidAmountRupees]);
+
+  // Handle click outside to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        clientDropdownRef.current &&
+        !clientDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsClientDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -184,25 +217,76 @@ export default function WorkForm({
           {/* Client Selection */}
           <div className="space-y-2">
             <Label htmlFor="clientId">Client *</Label>
-            <Select
-              value={formData.clientId}
-              onValueChange={(value) =>
-                handleInputChange("clientId", value as Id<"clients">)
-              }
-            >
-              <SelectTrigger
-                className={errors.clientId ? "border-red-500" : ""}
+            <div className="relative" ref={clientDropdownRef}>
+              <Button
+                type="button"
+                variant="outline"
+                role="combobox"
+                aria-expanded={isClientDropdownOpen}
+                className={`w-full justify-between ${errors.clientId ? "border-red-500" : ""}`}
+                onClick={() => setIsClientDropdownOpen(!isClientDropdownOpen)}
               >
-                <SelectValue placeholder="Select a client" />
-              </SelectTrigger>
-              <SelectContent>
-                {clientsData.clients.map((client) => (
-                  <SelectItem key={client._id} value={client._id}>
-                    {client.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                {selectedClient ? selectedClient.name : "Select a client..."}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+
+              {isClientDropdownOpen && (
+                <div className="absolute top-full z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg">
+                  {/* Search Input */}
+                  <div className="p-2 border-b border-gray-200">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <Input
+                        placeholder="Search clients..."
+                        value={clientSearch}
+                        onChange={(e) => setClientSearch(e.target.value)}
+                        className="pl-9 h-8 border-gray-200 focus:border-gray-300 focus:ring-gray-200"
+                        autoFocus
+                      />
+                    </div>
+                  </div>
+
+                  {/* Client List */}
+                  <div className="max-h-60 overflow-y-auto p-1">
+                    {filteredClients.length === 0 ? (
+                      <div className="py-2 px-3 text-sm text-gray-500">
+                        No clients found
+                      </div>
+                    ) : (
+                      filteredClients.map((client) => (
+                        <button
+                          key={client._id}
+                          type="button"
+                          className={`w-full text-left px-3 py-2 text-sm rounded-sm hover:bg-gray-100 flex items-center gap-2 ${
+                            formData.clientId === client._id
+                              ? "bg-gray-100"
+                              : ""
+                          }`}
+                          onClick={() => {
+                            handleInputChange("clientId", client._id);
+                            setIsClientDropdownOpen(false);
+                            setClientSearch("");
+                          }}
+                        >
+                          {formData.clientId === client._id && (
+                            <Check className="h-4 w-4 text-green-600" />
+                          )}
+                          <span
+                            className={
+                              formData.clientId === client._id
+                                ? "font-medium"
+                                : ""
+                            }
+                          >
+                            {client.name}
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
             {errors.clientId && (
               <p className="text-sm text-red-500">{errors.clientId}</p>
             )}

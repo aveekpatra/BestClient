@@ -70,9 +70,6 @@ export function ClientList({
   const [searchInput, setSearchInput] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [workTypeFilter, setWorkTypeFilter] = useState<WorkType | "all">("all");
-  const [balanceTypeFilter, setBalanceTypeFilter] = useState<
-    "all" | "positive" | "negative" | "zero"
-  >("all");
   const [sortField, setSortField] = useState<SortField>("name");
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
   const [currentPage, setCurrentPage] = useState(0);
@@ -98,8 +95,6 @@ export function ClientList({
     sortBy: sortField,
     sortOrder,
     workTypeFilter: workTypeFilter === "all" ? undefined : workTypeFilter,
-    balanceTypeFilter:
-      balanceTypeFilter === "all" ? undefined : balanceTypeFilter,
     searchTerm: searchTerm || undefined,
   });
 
@@ -126,7 +121,6 @@ export function ClientList({
     setSearchInput("");
     setSearchTerm("");
     setWorkTypeFilter("all");
-    setBalanceTypeFilter("all");
     setSortField("name");
     setSortOrder("asc");
     setCurrentPage(0);
@@ -225,44 +219,31 @@ export function ClientList({
         <div className="flex items-center gap-3">
           {/* Filter Dropdown */}
           <Select
-            value={`${workTypeFilter}-${balanceTypeFilter}`}
+            value={workTypeFilter}
             onValueChange={(value) => {
-              const [workType, balanceType] = value.split("-") as [
-                WorkType | "all",
-                "all" | "positive" | "negative" | "zero",
-              ];
+              const workType = value as WorkType | "all";
               setWorkTypeFilter(workType);
-              setBalanceTypeFilter(balanceType);
               handleFilterChange();
             }}
           >
-            <SelectTrigger className="w-40 border-gray-200">
+            <SelectTrigger className="w-auto border-gray-200">
               <Filter className="h-4 w-4 mr-2 text-gray-500" />
               <SelectValue placeholder="Filter" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all-all">All Clients</SelectItem>
-
-              {/* Status Filters */}
-              <div className="px-2 py-1.5 text-xs font-medium text-gray-500 border-b">
-                Status
-              </div>
-              <SelectItem value="all-positive">Active Clients</SelectItem>
-              <SelectItem value="all-negative">Inactive Clients</SelectItem>
-              <SelectItem value="all-zero">Balanced Clients</SelectItem>
+              <SelectItem value="all">All Clients</SelectItem>
 
               {/* Work Type Filters */}
-              <div className="px-2 py-1.5 text-xs font-medium text-gray-500 border-b border-t mt-1">
+              <div className="px-2 py-1.5 text-xs font-medium text-gray-500 border-b">
                 Work Type
               </div>
-              <SelectItem value="online-work-all">Online Work</SelectItem>
-              <SelectItem value="health-insurance-all">
-                Health Insurance
-              </SelectItem>
-              <SelectItem value="life-insurance-all">Life Insurance</SelectItem>
-              <SelectItem value="income-tax-all">Income Tax</SelectItem>
-              <SelectItem value="mutual-funds-all">Mutual Funds</SelectItem>
-              <SelectItem value="others-all">Others</SelectItem>
+              <SelectItem value="online-work">Online Work</SelectItem>
+              <SelectItem value="health-insurance">Health Insurance</SelectItem>
+              <SelectItem value="life-insurance">Life Insurance</SelectItem>
+              <SelectItem value="income-tax">Income Tax</SelectItem>
+              <SelectItem value="p-tax">P-Tax</SelectItem>
+              <SelectItem value="mutual-funds">Mutual Funds</SelectItem>
+              <SelectItem value="others">Others</SelectItem>
             </SelectContent>
           </Select>
 
@@ -293,7 +274,6 @@ export function ClientList({
 
           {/* Clear Filters - only show if filters are active */}
           {(workTypeFilter !== "all" ||
-            balanceTypeFilter !== "all" ||
             searchInput ||
             sortField !== "name" ||
             sortOrder !== "asc") && (
@@ -550,7 +530,7 @@ export function ClientList({
                     handlePageSizeChange(parseInt(value))
                   }
                 >
-                  <SelectTrigger className="w-16 h-8 border-gray-200">
+                  <SelectTrigger className="w-auto h-8 border-gray-200">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

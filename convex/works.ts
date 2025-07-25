@@ -282,6 +282,7 @@ export const getWorks = query({
         v.literal("health-insurance"),
         v.literal("life-insurance"),
         v.literal("income-tax"),
+        v.literal("p-tax"),
         v.literal("mutual-funds"),
         v.literal("others"),
       ),

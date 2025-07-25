@@ -318,7 +318,7 @@ export default function WorkList({
             className="flex items-center gap-2 bg-gray-900 hover:bg-gray-800"
           >
             <Plus className="h-4 w-4" />
-            Add Work
+            Add Transaction
           </Button>
         )}
       </div>
@@ -341,7 +341,12 @@ export default function WorkList({
           <Select
             value={`${filters.workType || "all"}-${filters.paymentStatus || "all"}-${filters.clientId || "all"}`}
             onValueChange={(value) => {
-              const [workType, paymentStatus, clientId] = value.split("-");
+              // Split by the last two "-" to handle work types with hyphens
+              const parts = value.split("-");
+              const clientId = parts[parts.length - 1]; // Last part
+              const paymentStatus = parts[parts.length - 2]; // Second to last part
+              const workType = parts.slice(0, parts.length - 2).join("-"); // Everything before the last two parts
+
               handleFilterChange(
                 "workType",
                 workType === "all" ? undefined : (workType as WorkType),
@@ -358,7 +363,7 @@ export default function WorkList({
               );
             }}
           >
-            <SelectTrigger className="w-40 border-gray-200">
+            <SelectTrigger className="w-auto border-gray-200">
               <Filter className="h-4 w-4 mr-2 text-gray-500" />
               <SelectValue placeholder="Filter" />
             </SelectTrigger>
@@ -385,6 +390,7 @@ export default function WorkList({
                 Life Insurance
               </SelectItem>
               <SelectItem value="income-tax-all-all">Income Tax</SelectItem>
+              <SelectItem value="p-tax-all-all">P-Tax</SelectItem>
               <SelectItem value="mutual-funds-all-all">Mutual Funds</SelectItem>
               <SelectItem value="others-all-all">Others</SelectItem>
             </SelectContent>
@@ -778,7 +784,7 @@ export default function WorkList({
                     handlePageSizeChange(parseInt(value))
                   }
                 >
-                  <SelectTrigger className="w-16 h-8 border-gray-200">
+                  <SelectTrigger className="w-auto h-8 border-gray-200">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
